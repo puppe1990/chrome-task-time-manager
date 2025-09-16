@@ -2,6 +2,7 @@
 class TaskManager {
     constructor() {
         this.tasks = [];
+        this.projects = [];
         this.currentEditingTask = null;
         this.timers = new Map(); // Para armazenar timers ativos
         this.init();
@@ -9,10 +10,12 @@ class TaskManager {
 
     async init() {
         await this.loadTasks();
+        await this.loadProjects();
         this.setupEventListeners();
         this.renderTasks();
         this.updateStats();
-        this.updateCategoryFilter();
+        this.updateProjectFilter();
+        this.renderProjects();
     }
 
     // Event Listeners
@@ -27,10 +30,15 @@ class TaskManager {
         document.getElementById('closeModal').addEventListener('click', () => this.closeTaskModal());
         document.getElementById('cancelTask').addEventListener('click', () => this.closeTaskModal());
         document.getElementById('taskForm').addEventListener('submit', (e) => this.handleTaskSubmit(e));
+        const projectSelectEl = document.getElementById('projectSelect');
+        if (projectSelectEl) {
+            projectSelectEl.addEventListener('change', () => this.onProjectSelectChange());
+        }
 
         // Filters
         document.getElementById('statusFilter').addEventListener('change', () => this.renderTasks());
-        document.getElementById('categoryFilter').addEventListener('change', () => this.renderTasks());
+        const projectFilterEl = document.getElementById('projectFilter');
+        if (projectFilterEl) projectFilterEl.addEventListener('change', () => this.renderTasks());
 
         // Close modal when clicking outside
         document.getElementById('taskModal').addEventListener('click', (e) => {
@@ -38,6 +46,16 @@ class TaskManager {
                 this.closeTaskModal();
             }
         });
+
+        // Close project modal when clicking outside
+        const projectModalEl = document.getElementById('projectModal');
+        if (projectModalEl) {
+            projectModalEl.addEventListener('click', (e) => {
+                if (e.target.id === 'projectModal') {
+                    this.closeProjectModal();
+                }
+            });
+        }
 
         // Delegated actions inside tasks list (avoid inline handlers)
         const tasksList = document.getElementById('tasksList');
@@ -69,6 +87,82 @@ class TaskManager {
                     break;
             }
         });
+
+        // Projects tab actions
+        const addProjectBtn = document.getElementById('addProjectBtn');
+        if (addProjectBtn) {
+            addProjectBtn.addEventListener('click', () => this.openProjectModal());
+        }
+
+        // Project modal events
+        const closeProjectModalBtn = document.getElementById('closeProjectModal');
+        const cancelProjectBtn = document.getElementById('cancelProject');
+        const projectForm = document.getElementById('projectForm');
+        if (closeProjectModalBtn) closeProjectModalBtn.addEventListener('click', () => this.closeProjectModal());
+        if (cancelProjectBtn) cancelProjectBtn.addEventListener('click', () => this.closeProjectModal());
+        if (projectForm) projectForm.addEventListener('submit', (e) => this.handleProjectSubmit(e));
+
+        const projectsList = document.getElementById('projectsList');
+        if (projectsList) {
+            projectsList.addEventListener('click', async (e) => {
+                const btn = e.target.closest('button[data-action]');
+                if (!btn) return;
+                const action = btn.dataset.action;
+                const projectId = btn.dataset.projectId;
+                if (action === 'delete-project') {
+                    const inUse = this.tasks.some(t => t.projectId === projectId);
+                    if (inUse) {
+                        alert('Não é possível excluir um projeto com tarefas associadas.');
+                        return;
+                    }
+                    await this.deleteProject(projectId);
+                    this.updateProjectFilter();
+                    this.renderProjects();
+                    this.renderTasks();
+                    return;
+                }
+                if (action === 'rename-project') {
+                    const proj = this.projects.find(p => p.id === projectId);
+                    if (!proj) return;
+                    this.openProjectModal(proj);
+                }
+            });
+        }
+    }
+
+    openProjectModal(project = null) {
+        const modal = document.getElementById('projectModal');
+        document.getElementById('projectId').value = project ? project.id : '';
+        document.getElementById('projectName').value = project ? project.name : '';
+        document.getElementById('projectModalTitle').textContent = project ? 'Editar Projeto' : 'Novo Projeto';
+        modal.style.display = 'block';
+    }
+
+    closeProjectModal() {
+        const modal = document.getElementById('projectModal');
+        modal.style.display = 'none';
+        document.getElementById('projectId').value = '';
+        document.getElementById('projectName').value = '';
+    }
+
+    async handleProjectSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('projectId').value;
+        const name = document.getElementById('projectName').value.trim();
+        if (!name) return;
+
+        if (id) {
+            const proj = this.projects.find(p => p.id === id);
+            if (proj) proj.name = name;
+        } else {
+            this.createProjectSync(name);
+        }
+
+        await this.saveProjects();
+        this.updateProjectFilter();
+        this.renderProjects();
+        this.populateProjectSelect();
+        this.closeProjectModal();
     }
 
     // Storage Management
@@ -82,11 +176,29 @@ class TaskManager {
         }
     }
 
+    async loadProjects() {
+        try {
+            const result = await chrome.storage.local.get(['projects']);
+            this.projects = result.projects || [];
+        } catch (error) {
+            console.error('Erro ao carregar projetos:', error);
+            this.projects = [];
+        }
+    }
+
     async saveTasks() {
         try {
             await chrome.storage.local.set({ tasks: this.tasks });
         } catch (error) {
             console.error('Erro ao salvar tarefas:', error);
+        }
+    }
+
+    async saveProjects() {
+        try {
+            await chrome.storage.local.set({ projects: this.projects });
+        } catch (error) {
+            console.error('Erro ao salvar projetos:', error);
         }
     }
 
@@ -96,7 +208,7 @@ class TaskManager {
             id: Date.now().toString(),
             title: taskData.title,
             description: taskData.description || '',
-            category: taskData.category || '',
+            projectId: taskData.projectId || null,
             estimatedHours: parseFloat(taskData.estimatedHours) || 0,
             actualHours: parseFloat(taskData.actualHours) || 0,
             deadline: taskData.deadline || null,
@@ -107,7 +219,7 @@ class TaskManager {
         
         this.tasks.push(task);
         this.saveTasks();
-        this.updateCategoryFilter();
+        this.updateProjectFilter();
         this.updateStats();
     }
 
@@ -128,7 +240,7 @@ class TaskManager {
         this.tasks = this.tasks.filter(t => t.id !== taskId);
         this.saveTasks();
         this.updateStats();
-        this.updateCategoryFilter();
+        this.updateProjectFilter();
     }
 
     // UI Management
@@ -148,25 +260,44 @@ class TaskManager {
         if (tabName === 'stats') {
             this.updateStats();
         }
+        if (tabName === 'projects') {
+            this.renderProjects();
+        }
     }
 
     openTaskModal(task = null) {
         this.currentEditingTask = task;
         const modal = document.getElementById('taskModal');
         const form = document.getElementById('taskForm');
+        this.populateProjectSelect();
         
         if (task) {
             document.getElementById('modalTitle').textContent = 'Editar Tarefa';
             document.getElementById('taskTitle').value = task.title;
             document.getElementById('taskDescription').value = task.description;
-            document.getElementById('taskCategory').value = task.category;
             document.getElementById('estimatedHours').value = task.estimatedHours;
             document.getElementById('taskDeadline').value = task.deadline || '';
             document.getElementById('taskStatus').value = task.status;
+            const projectSelect = document.getElementById('projectSelect');
+            projectSelect.value = task.projectId || '';
+            if (!projectSelect.value) {
+                projectSelect.value = '__new__';
+                document.getElementById('newProjectGroup').style.display = 'block';
+            } else {
+                document.getElementById('newProjectGroup').style.display = 'none';
+            }
         } else {
             document.getElementById('modalTitle').textContent = 'Nova Tarefa';
             form.reset();
             document.getElementById('estimatedHours').value = 1;
+            const projectSelect = document.getElementById('projectSelect');
+            if (this.projects.length > 0) {
+                projectSelect.value = this.projects[0].id;
+                document.getElementById('newProjectGroup').style.display = 'none';
+            } else {
+                projectSelect.value = '__new__';
+                document.getElementById('newProjectGroup').style.display = 'block';
+            }
         }
         
         modal.style.display = 'block';
@@ -183,11 +314,26 @@ class TaskManager {
         const formData = {
             title: document.getElementById('taskTitle').value.trim(),
             description: document.getElementById('taskDescription').value.trim(),
-            category: document.getElementById('taskCategory').value.trim(),
             estimatedHours: document.getElementById('estimatedHours').value,
             deadline: document.getElementById('taskDeadline').value,
             status: document.getElementById('taskStatus').value
         };
+
+        // Project selection
+        const projectSelect = document.getElementById('projectSelect');
+        const selected = projectSelect.value;
+        if (selected === '__new__') {
+            const name = document.getElementById('newProjectName').value.trim();
+            if (!name) {
+                alert('Informe o nome do novo projeto.');
+                return;
+            }
+            const project = this.createProjectSync(name);
+            this.saveProjects();
+            formData.projectId = project.id;
+        } else {
+            formData.projectId = selected || null;
+        }
 
         if (!formData.title) {
             alert('Por favor, insira um título para a tarefa.');
@@ -208,7 +354,7 @@ class TaskManager {
     renderTasks() {
         const tasksList = document.getElementById('tasksList');
         const statusFilter = document.getElementById('statusFilter').value;
-        const categoryFilter = document.getElementById('categoryFilter').value;
+        const projectFilter = document.getElementById('projectFilter') ? document.getElementById('projectFilter').value : '';
 
         let filteredTasks = this.tasks;
 
@@ -216,8 +362,8 @@ class TaskManager {
             filteredTasks = filteredTasks.filter(task => task.status === statusFilter);
         }
 
-        if (categoryFilter) {
-            filteredTasks = filteredTasks.filter(task => task.category === categoryFilter);
+        if (projectFilter) {
+            filteredTasks = filteredTasks.filter(task => task.projectId === projectFilter);
         }
 
         if (filteredTasks.length === 0) {
@@ -274,15 +420,11 @@ class TaskManager {
                 <div class="task-header">
                     <div>
                         <div class="task-title">${this.escapeHtml(task.title)}</div>
-                        ${task.category ? `<span class="task-category">${this.escapeHtml(task.category)}</span>` : ''}
+                        ${this.getProjectName(task.projectId) ? `<span class=\"task-category\">${this.escapeHtml(this.getProjectName(task.projectId))}</span>` : ''}
                     </div>
                     <div class="task-actions">
-                        <button class="btn btn-small btn-success" onclick="taskManager.openTaskModal(${JSON.stringify(task).replace(/"/g, '&quot;')})">
-                            ✏️
-                        </button>
-                        <button class="btn btn-small btn-secondary" onclick="taskManager.deleteTask('${task.id}')">
-                            🗑️
-                        </button>
+                        <button class="btn btn-small btn-success" data-action="edit" data-task-id="${task.id}">✏️</button>
+                        <button class="btn btn-small btn-secondary" data-action="delete" data-task-id="${task.id}">🗑️</button>
                     </div>
                 </div>
                 
@@ -307,14 +449,8 @@ class TaskManager {
                         ${this.formatTime(task.actualHours * 3600)}
                     </div>
                     <div class="timer-controls">
-                        <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" 
-                                onclick="taskManager.toggleTimer('${task.id}')">
-                            ${isTimerRunning ? '⏸️' : '▶️'}
-                        </button>
-                        <button class="btn btn-small btn-secondary" 
-                                onclick="taskManager.resetTimer('${task.id}')">
-                            🔄
-                        </button>
+                        <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" data-action="toggle-timer" data-task-id="${task.id}">${isTimerRunning ? '⏸️' : '▶️'}</button>
+                        <button class="btn btn-small btn-secondary" data-action="reset-timer" data-task-id="${task.id}">🔄</button>
                     </div>
                 </div>
             </div>
@@ -408,26 +544,85 @@ class TaskManager {
         document.getElementById('efficiency').textContent = `${efficiency}%`;
     }
 
-    updateCategoryFilter() {
-        const categories = [...new Set(this.tasks.map(t => t.category).filter(c => c))];
-        const categoryFilter = document.getElementById('categoryFilter');
-        
-        // Keep current selection
-        const currentValue = categoryFilter.value;
-        
-        // Clear and rebuild options
-        categoryFilter.innerHTML = '<option value="">Todas as Categorias</option>';
-        categories.forEach(category => {
+    updateProjectFilter() {
+        const projectFilter = document.getElementById('projectFilter');
+        if (!projectFilter) return;
+
+        const currentValue = projectFilter.value;
+        projectFilter.innerHTML = '<option value="">Todos os Projetos</option>';
+        this.projects.forEach(p => {
             const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            categoryFilter.appendChild(option);
+            option.value = p.id;
+            option.textContent = p.name;
+            projectFilter.appendChild(option);
         });
-        
-        // Restore selection if still valid
-        if (categories.includes(currentValue)) {
-            categoryFilter.value = currentValue;
+        if (this.projects.some(p => p.id === currentValue)) {
+            projectFilter.value = currentValue;
         }
+    }
+
+    populateProjectSelect() {
+        const select = document.getElementById('projectSelect');
+        if (!select) return;
+        select.innerHTML = '';
+        this.projects.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            select.appendChild(opt);
+        });
+        const createOpt = document.createElement('option');
+        createOpt.value = '__new__';
+        createOpt.textContent = 'Criar novo projeto...';
+        select.appendChild(createOpt);
+    }
+
+    onProjectSelectChange() {
+        const select = document.getElementById('projectSelect');
+        const group = document.getElementById('newProjectGroup');
+        if (!select || !group) return;
+        group.style.display = select.value === '__new__' ? 'block' : 'none';
+    }
+
+    createProjectSync(name) {
+        const project = { id: `p_${Date.now()}`, name, createdAt: new Date().toISOString() };
+        this.projects.push(project);
+        return project;
+    }
+
+    async deleteProject(projectId) {
+        this.projects = this.projects.filter(p => p.id !== projectId);
+        await this.saveProjects();
+    }
+
+    getProjectName(projectId) {
+        const p = this.projects.find(pr => pr.id === projectId);
+        return p ? p.name : '';
+    }
+
+    renderProjects() {
+        const container = document.getElementById('projectsList');
+        if (!container) return;
+        if (this.projects.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>Nenhum projeto cadastrado.</p></div>';
+            return;
+        }
+        container.innerHTML = this.projects.map(p => {
+            const count = this.tasks.filter(t => t.projectId === p.id).length;
+            return `
+                <div class=\"task-card\">
+                    <div class=\"task-header\">
+                        <div>
+                            <div class=\"task-title\">${this.escapeHtml(p.name)}</div>
+                            <span class=\"task-category\">${count} tarefa(s)</span>
+                        </div>
+                        <div class=\"task-actions\"> 
+                            <button class=\"btn btn-small btn-success\" data-action=\"rename-project\" data-project-id=\"${p.id}\">✏️</button>
+                            <button class=\"btn btn-small btn-secondary\" data-action=\"delete-project\" data-project-id=\"${p.id}\">🗑️</button>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     }
 
     // Utility Functions
