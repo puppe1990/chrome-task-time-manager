@@ -1,6 +1,7 @@
 # ⏱️ Task Time Manager - Extensão Chrome
 
 Uma extensão do Chrome para gerenciamento de tarefas com cronômetro integrado, prazos e acompanhamento de progresso.
+<img width="407" height="596" alt="Screenshot 2025-09-16 at 08 31 08" src="https://github.com/user-attachments/assets/006368ae-776d-4921-abd9-db30df83d73a" />
 
 ## 🚀 Funcionalidades
 
