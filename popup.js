@@ -491,21 +491,21 @@ class TaskManager {
                 btn.dataset.taskId = taskId;
             });
 
-            // Timer controls
+            // Timer controls (order: play, edit, restart)
             const toggleBtn = card.querySelector('.timer-controls .btn:nth-child(1)');
-            const resetBtn = card.querySelector('.timer-controls .btn:nth-child(2)');
-            const editBtn = card.querySelector('.timer-controls .btn:nth-child(3)');
+            const editBtn = card.querySelector('.timer-controls .btn:nth-child(2)');
+            const resetBtn = card.querySelector('.timer-controls .btn:nth-child(3)');
             if (toggleBtn) {
                 toggleBtn.dataset.action = 'toggle-timer';
                 toggleBtn.dataset.taskId = taskId;
             }
-            if (resetBtn) {
-                resetBtn.dataset.action = 'reset-timer';
-                resetBtn.dataset.taskId = taskId;
-            }
             if (editBtn) {
                 editBtn.dataset.action = 'edit-timer';
                 editBtn.dataset.taskId = taskId;
+            }
+            if (resetBtn) {
+                resetBtn.dataset.action = 'reset-timer';
+                resetBtn.dataset.taskId = taskId;
             }
         });
     }
@@ -560,8 +560,8 @@ class TaskManager {
                     </div>
                     <div class="timer-controls">
                         <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" data-action="toggle-timer" data-task-id="${task.id}">${isTimerRunning ? '⏸️' : '▶️'}</button>
-                        <button class="btn btn-small btn-secondary" data-action="reset-timer" data-task-id="${task.id}">🔄</button>
                         <button class="btn btn-small" title="Editar tempo" data-action="edit-timer" data-task-id="${task.id}">✏️</button>
+                        <button class="btn btn-small btn-secondary" data-action="reset-timer" data-task-id="${task.id}">🔄</button>
                     </div>
                     ${task.hourlyRate && task.hourlyRate > 0 ? `
                     <div class="task-cost">
