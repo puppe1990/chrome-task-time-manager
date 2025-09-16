@@ -211,6 +211,7 @@ class TaskManager {
             projectId: taskData.projectId || null,
             estimatedHours: parseFloat(taskData.estimatedHours) || 0,
             actualHours: parseFloat(taskData.actualHours) || 0,
+            hourlyRate: parseFloat(taskData.hourlyRate) || 0,
             deadline: taskData.deadline || null,
             status: taskData.status || 'Not Started',
             createdAt: new Date().toISOString(),
@@ -276,6 +277,7 @@ class TaskManager {
             document.getElementById('taskTitle').value = task.title;
             document.getElementById('taskDescription').value = task.description;
             document.getElementById('estimatedHours').value = task.estimatedHours;
+            document.getElementById('hourlyRate').value = typeof task.hourlyRate === 'number' ? task.hourlyRate : '';
             document.getElementById('taskDeadline').value = task.deadline || '';
             document.getElementById('taskStatus').value = task.status;
             const projectSelect = document.getElementById('projectSelect');
@@ -290,6 +292,7 @@ class TaskManager {
             document.getElementById('modalTitle').textContent = 'Nova Tarefa';
             form.reset();
             document.getElementById('estimatedHours').value = 1;
+            document.getElementById('hourlyRate').value = '';
             const projectSelect = document.getElementById('projectSelect');
             if (this.projects.length > 0) {
                 projectSelect.value = this.projects[0].id;
@@ -334,6 +337,10 @@ class TaskManager {
         } else {
             formData.projectId = selected || null;
         }
+
+        // Hourly rate
+        const hourlyRateVal = parseFloat(document.getElementById('hourlyRate').value);
+        formData.hourlyRate = isNaN(hourlyRateVal) ? 0 : hourlyRateVal;
 
         if (!formData.title) {
             alert('Por favor, insira um título para a tarefa.');
