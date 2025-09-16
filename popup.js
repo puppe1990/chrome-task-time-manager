@@ -104,9 +104,13 @@ class TaskManager {
                 case 'toggle-timer':
                     this.toggleTimer(taskId);
                     break;
-                case 'reset-timer':
-                    this.resetTimer(taskId);
+                case 'reset-timer': {
+                    const task = this.tasks.find(t => t.id === taskId);
+                    const taskName = task && task.title ? `"${task.title}"` : 'esta tarefa';
+                    const ok = confirm(`Tem certeza que deseja reiniciar o tempo de ${taskName}?\nEsta ação não pode ser desfeita.`);
+                    if (ok) this.resetTimer(taskId);
                     break;
+                }
                 case 'edit-timer':
                     this.openEditTimerModal(taskId);
                     break;
