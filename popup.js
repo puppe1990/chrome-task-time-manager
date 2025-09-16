@@ -11,6 +11,8 @@ class TaskManager {
 
     async init() {
         await this.loadTasks();
+        // Restaurar timers que estavam em execução previamente
+        await this.loadRunningTimers();
         await this.loadProjects();
         this.setupEventListeners();
         this.renderTasks();
@@ -238,6 +240,45 @@ class TaskManager {
         }
     }
 
+    // Timers persistence (somente timers em execução)
+    async loadRunningTimers() {
+        try {
+            const result = await chrome.storage.local.get(['runningTimers']);
+            const stored = result.runningTimers || {};
+            this.timers = new Map();
+            Object.entries(stored).forEach(([taskId, t]) => {
+                // Apenas restaura se ainda existir a tarefa
+                if (this.tasks.some(task => task.id === taskId)) {
+                    this.timers.set(taskId, {
+                        startTime: typeof t.startTime === 'number' ? t.startTime : null,
+                        elapsed: typeof t.elapsed === 'number' ? t.elapsed : 0,
+                        isRunning: !!t.isRunning
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Erro ao carregar timers:', error);
+        }
+    }
+
+    async saveRunningTimers() {
+        try {
+            const obj = {};
+            this.timers.forEach((t, taskId) => {
+                if (t && t.isRunning) {
+                    obj[taskId] = {
+                        startTime: t.startTime,
+                        elapsed: t.elapsed,
+                        isRunning: true
+                    };
+                }
+            });
+            await chrome.storage.local.set({ runningTimers: obj });
+        } catch (error) {
+            console.error('Erro ao salvar timers:', error);
+        }
+    }
+
     // Task CRUD Operations
     createTask(taskData) {
         const task = {
@@ -275,6 +316,11 @@ class TaskManager {
 
     deleteTask(taskId) {
         this.tasks = this.tasks.filter(t => t.id !== taskId);
+        // Remover timer associado, se houver
+        if (this.timers.has(taskId)) {
+            this.timers.delete(taskId);
+            this.saveRunningTimers();
+        }
         this.saveTasks();
         this.updateStats();
         this.updateProjectFilter();
@@ -460,6 +506,10 @@ class TaskManager {
         const timer = this.timers.get(task.id);
         const isTimerRunning = timer && timer.isRunning;
 
+        const now = Date.now();
+        const displaySeconds = isTimerRunning
+            ? (timer.elapsed + Math.floor((now - timer.startTime) / 1000))
+            : Math.round((task.actualHours || 0) * 3600);
         return `
             <div class="task-card" data-task-id="${task.id}">
                 <div class="task-header">
@@ -497,7 +547,7 @@ class TaskManager {
                 
                 <div class="timer">
                     <div class="timer-display" id="timer-${task.id}">
-                        ${this.formatTime(task.actualHours * 3600)}
+                        ${this.formatTime(displaySeconds)}
                     </div>
                     <div class="timer-controls">
                         <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" data-action="toggle-timer" data-task-id="${task.id}">${isTimerRunning ? '⏸️' : '▶️'}</button>
@@ -538,10 +588,14 @@ class TaskManager {
             // Update task actual hours
             task.actualHours = timer.elapsed / 3600;
             this.updateTask(taskId, { actualHours: task.actualHours });
+            // Persistir estado dos timers (removerá este se não estiver rodando)
+            this.saveRunningTimers();
         } else {
             // Start timer
             timer.startTime = Date.now();
             timer.isRunning = true;
+            // Persistir timers em execução
+            this.saveRunningTimers();
         }
 
         this.renderTasks();
@@ -554,6 +608,7 @@ class TaskManager {
         this.timers.delete(taskId);
         task.actualHours = 0;
         this.updateTask(taskId, { actualHours: 0 });
+        this.saveRunningTimers();
         this.renderTasks();
     }
 
@@ -604,6 +659,8 @@ class TaskManager {
             timer.elapsed = seconds;
             timer.startTime = null;
         }
+        // Atualizar persistência de timers
+        this.saveRunningTimers();
 
         this.closeEditTimerModal();
         this.renderTasks();
