@@ -1000,14 +1000,14 @@ class TaskManager {
   <table>
     <thead>
       <tr>
-        <th>Horas</th>
+        <th>Horas (hh:mm:ss)</th>
         <th>Valor/hora</th>
         <th class="right">Subtotal</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td>${this.formatHoursDecimal(hours)} h</td>
+        <td>${this.formatTime(Math.round(hours * 3600))}</td>
         <td>${rate > 0 ? this.formatCurrency(rate) : '—'}</td>
         <td class="right">${this.formatCurrency(cost)}</td>
       </tr>
@@ -1047,7 +1047,7 @@ class TaskManager {
                 <td>${this.escapeHtml(r.title)}</td>
                 <td>${this.escapeHtml(r.status)}</td>
                 <td>${r.deadline}</td>
-                <td class="right">${this.formatHoursDecimal(r.hours)} h</td>
+        <td class="right">${this.formatTime(Math.round(r.hours * 3600))}</td>
                 <td class="right">${r.rate > 0 ? this.formatCurrency(r.rate) : '—'}</td>
                 <td class="right">${this.formatCurrency(r.cost)}</td>
             </tr>
@@ -1082,7 +1082,7 @@ class TaskManager {
         <th>Tarefa</th>
         <th>Status</th>
         <th>Prazo</th>
-        <th class="right">Horas</th>
+        <th class="right">Horas (hh:mm:ss)</th>
         <th class="right">Valor/hora</th>
         <th class="right">Subtotal</th>
       </tr>
@@ -1091,7 +1091,7 @@ class TaskManager {
       ${tableRows || '<tr><td colspan="6" class="small muted">Nenhuma tarefa vinculada.</td></tr>'}
       <tr>
         <td colspan="3" class="right total">Totais</td>
-        <td class="right total">${this.formatHoursDecimal(totalHours)} h</td>
+        <td class="right total">${this.formatTime(Math.round(totalHours * 3600))}</td>
         <td></td>
         <td class="right total">${this.formatCurrency(totalCost)}</td>
       </tr>
