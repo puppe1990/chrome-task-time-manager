@@ -128,6 +128,18 @@ class TaskManager {
                 }
             });
         }
+
+        // Backup tab actions
+        const exportBtn = document.getElementById('exportDataBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportData());
+        }
+        const importBtn = document.getElementById('importDataBtn');
+        const importInput = document.getElementById('importFileInput');
+        if (importBtn && importInput) {
+            importBtn.addEventListener('click', () => importInput.click());
+            importInput.addEventListener('change', (e) => this.handleImportFile(e.target.files[0]));
+        }
     }
 
     openProjectModal(project = null) {
@@ -675,6 +687,103 @@ class TaskManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Backup: Export/Import
+    exportData() {
+        try {
+            const payload = {
+                meta: {
+                    app: 'chrome-task-time-manager',
+                    version: 1,
+                    exportedAt: new Date().toISOString()
+                },
+                projects: this.projects || [],
+                tasks: this.tasks || []
+            };
+            const json = JSON.stringify(payload, null, 2);
+            const ts = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const filename = `task-time-manager-backup-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+            this.downloadFile(filename, json);
+        } catch (err) {
+            console.error('Erro ao exportar:', err);
+            alert('Falha ao exportar dados.');
+        }
+    }
+
+    downloadFile(filename, content) {
+        const blob = new Blob([content], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    async handleImportFile(file) {
+        const statusEl = document.getElementById('importStatus');
+        const inputEl = document.getElementById('importFileInput');
+        if (!file) return;
+        if (statusEl) statusEl.textContent = `Arquivo selecionado: ${file.name} (${file.size} bytes)`;
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (!data || (typeof data !== 'object')) throw new Error('JSON inválido');
+            const replace = confirm('Deseja substituir TODOS os dados atuais?\nOK = Substituir, Cancelar = Mesclar');
+            await this.applyImport(data, replace);
+            if (statusEl) statusEl.textContent = `Importação concluída com sucesso (${replace ? 'substituição' : 'mesclagem'}).`;
+            if (inputEl) inputEl.value = '';
+        } catch (err) {
+            console.error('Erro ao importar:', err);
+            alert('Falha ao importar dados. Verifique o arquivo JSON.');
+        }
+    }
+
+    async applyImport(data, replace = false) {
+        const incomingProjects = Array.isArray(data.projects) ? data.projects : [];
+        const incomingTasks = Array.isArray(data.tasks) ? data.tasks : [];
+
+        if (replace) {
+            this.projects = incomingProjects;
+            this.tasks = incomingTasks;
+        } else {
+            // Mesclar por id
+            const projectById = new Map(this.projects.map(p => [p.id, { ...p }]));
+            incomingProjects.forEach(p => {
+                if (!p || !p.id) return;
+                if (projectById.has(p.id)) {
+                    projectById.set(p.id, { ...projectById.get(p.id), ...p });
+                } else {
+                    projectById.set(p.id, { ...p });
+                }
+            });
+            this.projects = Array.from(projectById.values());
+
+            const taskById = new Map(this.tasks.map(t => [t.id, { ...t }]));
+            incomingTasks.forEach(t => {
+                if (!t || !t.id) return;
+                if (taskById.has(t.id)) {
+                    taskById.set(t.id, { ...taskById.get(t.id), ...t });
+                } else {
+                    taskById.set(t.id, { ...t });
+                }
+            });
+            this.tasks = Array.from(taskById.values());
+        }
+
+        await this.saveProjects();
+        await this.saveTasks();
+        this.updateProjectFilter();
+        this.renderProjects();
+        this.renderTasks();
+        this.updateStats();
+        alert('Dados importados com sucesso.');
     }
 }
 

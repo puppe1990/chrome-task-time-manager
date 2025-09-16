@@ -19,6 +19,7 @@
             <button class="tab active" data-tab="tasks">Tarefas</button>
             <button class="tab" data-tab="stats">Estatísticas</button>
             <button class="tab" data-tab="projects">Projetos</button>
+            <button class="tab" data-tab="backup">Backup</button>
         </nav>
 
         <!-- Tasks Tab -->
@@ -88,6 +89,37 @@
             </div>
             <div id="projectsList" class="tasks-list">
                 <!-- Projetos serão inseridos aqui -->
+            </div>
+        </div>
+
+        <!-- Backup Tab -->
+        <div id="backupTab" class="tab-content">
+            <div class="tasks-list" style="gap:16px;">
+                <div class="task-card">
+                    <div class="task-header">
+                        <div>
+                            <div class="task-title">Exportar Dados</div>
+                            <span class="task-category">Baixa um arquivo JSON com tarefas e projetos</span>
+                        </div>
+                    </div>
+                    <p style="margin: 8px 0 12px; color:#666;">Inclui todas as tarefas e projetos salvos no armazenamento local da extensão.</p>
+                    <button id="exportDataBtn" class="btn btn-success">Exportar (.json)</button>
+                </div>
+
+                <div class="task-card">
+                    <div class="task-header">
+                        <div>
+                            <div class="task-title">Importar Dados</div>
+                            <span class="task-category">Carrega tarefas e projetos a partir de um JSON</span>
+                        </div>
+                    </div>
+                    <p style="margin: 8px 0 12px; color:#666;">Selecione um arquivo exportado anteriormente. Você poderá mesclar ou substituir os dados atuais.</p>
+                    <div class="filters" style="margin-top: 8px;">
+                        <button id="importDataBtn" class="btn btn-primary">Selecionar arquivo</button>
+                        <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;" />
+                    </div>
+                    <div id="importStatus" style="margin-top: 8px; color:#666; font-size: 13px;"></div>
+                </div>
             </div>
         </div>
     </div>
