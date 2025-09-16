@@ -85,6 +85,9 @@ class TaskManager {
                 case 'reset-timer':
                     this.resetTimer(taskId);
                     break;
+                case 'export-task-note':
+                    this.exportServiceNoteForTask(taskId);
+                    break;
             }
         });
 
@@ -125,6 +128,9 @@ class TaskManager {
                     const proj = this.projects.find(p => p.id === projectId);
                     if (!proj) return;
                     this.openProjectModal(proj);
+                }
+                if (action === 'export-project-note') {
+                    this.exportServiceNoteForProject(projectId);
                 }
             });
         }
@@ -407,17 +413,14 @@ class TaskManager {
             const taskId = card.dataset.taskId;
             if (!taskId) return;
 
-            const [editBtn, deleteBtn] = card.querySelectorAll('.task-actions .btn');
-            if (editBtn) {
-                editBtn.dataset.action = 'edit';
-                editBtn.dataset.taskId = taskId;
-            }
-            if (deleteBtn) {
-                deleteBtn.dataset.action = 'delete';
-                deleteBtn.dataset.taskId = taskId;
-            }
+            // Garantir que todos os botões dentro do card tenham o taskId associado
+            card.querySelectorAll('.task-actions .btn').forEach(btn => {
+                btn.dataset.taskId = taskId;
+            });
 
-            const [toggleBtn, resetBtn] = card.querySelectorAll('.timer-controls .btn');
+            // Timer controls
+            const toggleBtn = card.querySelector('.timer-controls .btn:nth-child(1)');
+            const resetBtn = card.querySelector('.timer-controls .btn:nth-child(2)');
             if (toggleBtn) {
                 toggleBtn.dataset.action = 'toggle-timer';
                 toggleBtn.dataset.taskId = taskId;
@@ -442,6 +445,7 @@ class TaskManager {
                         ${this.getProjectName(task.projectId) ? `<span class=\"task-category\">${this.escapeHtml(this.getProjectName(task.projectId))}</span>` : ''}
                     </div>
                     <div class="task-actions">
+                        <button class="btn btn-small" title="Exportar nota" data-action="export-task-note" data-task-id="${task.id}">📄</button>
                         <button class="btn btn-small btn-success" data-action="edit" data-task-id="${task.id}">✏️</button>
                         <button class="btn btn-small btn-secondary" data-action="delete" data-task-id="${task.id}">🗑️</button>
                     </div>
@@ -664,6 +668,7 @@ class TaskManager {
                             <span class=\"task-category\">${count} tarefa(s)</span>
                         </div>
                         <div class=\"task-actions\"> 
+                            <button class=\"btn btn-small\" title=\"Exportar nota do projeto\" data-action=\"export-project-note\" data-project-id=\"${p.id}\">📄</button>
                             <button class=\"btn btn-small btn-success\" data-action=\"rename-project\" data-project-id=\"${p.id}\">✏️</button>
                             <button class=\"btn btn-small btn-secondary\" data-action=\"delete-project\" data-project-id=\"${p.id}\">🗑️</button>
                         </div>
@@ -724,6 +729,212 @@ class TaskManager {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 0);
+    }
+
+    downloadBlob(filename, content, mime = 'text/plain') {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    exportServiceNoteForTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return alert('Tarefa não encontrada.');
+        const projectName = this.getProjectName(task.projectId) || 'Sem projeto';
+        const html = this.generateServiceNoteHTMLForTask(task, projectName);
+        const ts = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const slug = (task.title || 'tarefa').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '');
+        const filename = `nota-servico-tarefa-${slug}-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}.html`;
+        this.downloadBlob(filename, html, 'text/html');
+    }
+
+    exportServiceNoteForProject(projectId) {
+        const project = this.projects.find(p => p.id === projectId);
+        if (!project) return alert('Projeto não encontrado.');
+        const tasks = this.tasks.filter(t => t.projectId === projectId);
+        const html = this.generateServiceNoteHTMLForProject(project, tasks);
+        const ts = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const slug = (project.name || 'projeto').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '');
+        const filename = `nota-servico-projeto-${slug}-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}.html`;
+        this.downloadBlob(filename, html, 'text/html');
+    }
+
+    formatHoursDecimal(hours) {
+        const value = Number(hours) || 0;
+        return value.toFixed(2).replace('.', ',');
+    }
+
+    generateServiceNoteHeaderCSS() {
+        return `
+            <style>
+                body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #222; }
+                h1 { margin: 0 0 8px; font-size: 22px; }
+                h2 { margin: 24px 0 8px; font-size: 18px; }
+                .muted { color: #666; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+                .box { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-top: 12px; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+                th { background: #fafafa; }
+                .right { text-align: right; }
+                .total { font-weight: 600; }
+                .small { font-size: 12px; }
+                .badge { display:inline-block; padding:2px 8px; border-radius:12px; background:#f2f2f2; font-size:12px; }
+            </style>
+        `;
+    }
+
+    generateServiceNoteHTMLForTask(task, projectName) {
+        const now = new Date();
+        const brDate = now.toLocaleDateString('pt-BR');
+        const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString('pt-BR') : '-';
+        const hours = Number(task.actualHours || 0);
+        const rate = Number(task.hourlyRate || 0);
+        const cost = hours * rate;
+        const statusPt = this.getStatusText(task.status);
+        const descHtml = task.description ? this.escapeHtml(task.description).replace(/\n/g, '<br>') : '—';
+        return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nota de Serviço - ${this.escapeHtml(task.title)}</title>
+  ${this.generateServiceNoteHeaderCSS()}
+  <style>@media print { .no-print { display:none; } }</style>
+  <script>function printAndClose(){ window.print(); }</script>
+  </head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:8px;">
+    <button onclick="printAndClose()" style="padding:6px 12px;">Imprimir/Salvar PDF</button>
+  </div>
+  <h1>Nota de Serviço</h1>
+  <div class="muted small">Emitida em ${brDate}</div>
+  <div class="box">
+    <div class="grid">
+      <div><strong>Tarefa:</strong> ${this.escapeHtml(task.title)}</div>
+      <div><strong>Projeto:</strong> ${this.escapeHtml(projectName)}</div>
+      <div><strong>Status:</strong> <span class="badge">${this.escapeHtml(statusPt)}</span></div>
+      <div><strong>Prazo:</strong> ${deadline}</div>
+    </div>
+    <div style="margin-top:8px"><strong>Descrição:</strong><br>${descHtml}</div>
+  </div>
+
+  <h2>Resumo</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Horas</th>
+        <th>Valor/hora</th>
+        <th class="right">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${this.formatHoursDecimal(hours)} h</td>
+        <td>${rate > 0 ? this.formatCurrency(rate) : '—'}</td>
+        <td class="right">${this.formatCurrency(cost)}</td>
+      </tr>
+      <tr>
+        <td colspan="2" class="right total">Total</td>
+        <td class="right total">${this.formatCurrency(cost)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="small muted">Documento gerado pelo Task Time Manager.</p>
+</body>
+</html>`;
+    }
+
+    generateServiceNoteHTMLForProject(project, tasks) {
+        const now = new Date();
+        const brDate = now.toLocaleDateString('pt-BR');
+        const rows = tasks.map(t => {
+            const hours = Number(t.actualHours || 0);
+            const rate = Number(t.hourlyRate || 0);
+            const cost = hours * rate;
+            return {
+                title: t.title,
+                hours,
+                rate,
+                cost,
+                status: this.getStatusText(t.status),
+                deadline: t.deadline ? new Date(t.deadline).toLocaleDateString('pt-BR') : '-'
+            };
+        });
+        const totalHours = rows.reduce((s, r) => s + r.hours, 0);
+        const totalCost = rows.reduce((s, r) => s + r.cost, 0);
+
+        const tableRows = rows.map(r => `
+            <tr>
+                <td>${this.escapeHtml(r.title)}</td>
+                <td>${this.escapeHtml(r.status)}</td>
+                <td>${r.deadline}</td>
+                <td class="right">${this.formatHoursDecimal(r.hours)} h</td>
+                <td class="right">${r.rate > 0 ? this.formatCurrency(r.rate) : '—'}</td>
+                <td class="right">${this.formatCurrency(r.cost)}</td>
+            </tr>
+        `).join('');
+
+        return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nota de Serviço - Projeto ${this.escapeHtml(project.name)}</title>
+  ${this.generateServiceNoteHeaderCSS()}
+  <style>@media print { .no-print { display:none; } }</style>
+  <script>function printAndClose(){ window.print(); }</script>
+</head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:8px;">
+    <button onclick="printAndClose()" style="padding:6px 12px;">Imprimir/Salvar PDF</button>
+  </div>
+  <h1>Nota de Serviço</h1>
+  <div class="muted small">Emitida em ${brDate}</div>
+  <div class="box">
+    <div><strong>Projeto:</strong> ${this.escapeHtml(project.name)}</div>
+    <div class="small muted">${tasks.length} tarefa(s)</div>
+  </div>
+
+  <h2>Detalhamento das Tarefas</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tarefa</th>
+        <th>Status</th>
+        <th>Prazo</th>
+        <th class="right">Horas</th>
+        <th class="right">Valor/hora</th>
+        <th class="right">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows || '<tr><td colspan="6" class="small muted">Nenhuma tarefa vinculada.</td></tr>'}
+      <tr>
+        <td colspan="3" class="right total">Totais</td>
+        <td class="right total">${this.formatHoursDecimal(totalHours)} h</td>
+        <td></td>
+        <td class="right total">${this.formatCurrency(totalCost)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="small muted">Documento gerado pelo Task Time Manager.</p>
+</body>
+</html>`;
     }
 
     async handleImportFile(file) {

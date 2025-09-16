@@ -11,6 +11,7 @@ Uma extensão do Chrome para gerenciamento de tarefas com cronômetro integrado,
 - 📅 **Prazos**: Definir e acompanhar deadlines
 - 🔍 **Filtros**: Filtrar tarefas por status e categoria
 - 💾 **Armazenamento Local**: Dados salvos localmente no Chrome
+- 📄 **Nota de Serviço**: Exporte uma nota por tarefa ou por projeto (HTML imprimível)
 
 ## 📦 Instalação
 
@@ -71,6 +72,10 @@ Uma extensão do Chrome para gerenciamento de tarefas com cronômetro integrado,
 - Use os filtros na aba "Tarefas" para:
   - Filtrar por status (Não Iniciado, Em Progresso, etc.)
   - Filtrar por categoria
+
+### Exportando Nota de Serviço
+- Por tarefa: na lista de tarefas, clique no botão `📄` da tarefa para gerar uma nota de serviço em HTML. Use Imprimir para salvar como PDF.
+- Por projeto: na aba "Projetos", clique no botão `📄` do projeto para gerar a nota consolidada com todas as tarefas do projeto.
 
 ## 🛠️ Estrutura do Projeto
 
