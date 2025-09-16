@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Task Time Manager",
+  "version": "1.0.0",
+  "description": "Gerencie suas tarefas com cronômetro, prazos e acompanhamento de progresso",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Task Time Manager",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
