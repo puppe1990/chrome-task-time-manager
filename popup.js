@@ -441,7 +441,7 @@ class TaskManager {
                     <span class="task-status status-${task.status.toLowerCase().replace(' ', '-')}">
                         ${this.getStatusText(task.status)}
                     </span>
-                    <span class="task-time">${task.actualHours}h / ${task.estimatedHours}h</span>
+                    <span class="task-time">${this.formatTime(Math.round((task.actualHours || 0) * 3600))} / ${this.formatTime(Math.round((task.estimatedHours || 0) * 3600))}</span>
                 </div>
                 
                 ${task.deadline ? `
