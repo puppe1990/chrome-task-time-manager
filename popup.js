@@ -363,13 +363,9 @@ class TaskManager {
             document.getElementById('taskDeadline').value = task.deadline || '';
             document.getElementById('taskStatus').value = task.status;
             const projectSelect = document.getElementById('projectSelect');
+            // Permitir manter tarefa sem projeto selecionando a opção vazia
             projectSelect.value = task.projectId || '';
-            if (!projectSelect.value) {
-                projectSelect.value = '__new__';
-                document.getElementById('newProjectGroup').style.display = 'block';
-            } else {
-                document.getElementById('newProjectGroup').style.display = 'none';
-            }
+            document.getElementById('newProjectGroup').style.display = 'none';
         } else {
             document.getElementById('modalTitle').textContent = 'Nova Tarefa';
             form.reset();
@@ -772,6 +768,11 @@ class TaskManager {
         const select = document.getElementById('projectSelect');
         if (!select) return;
         select.innerHTML = '';
+        // Opção para manter a tarefa sem projeto
+        const noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = 'Sem projeto';
+        select.appendChild(noneOpt);
         this.projects.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id;
