@@ -5,6 +5,7 @@ class TaskManager {
         this.projects = [];
         this.currentEditingTask = null;
         this.timers = new Map(); // Para armazenar timers ativos
+        this.currentEditingTimerTaskId = null;
         this.init();
     }
 
@@ -57,6 +58,20 @@ class TaskManager {
             });
         }
 
+        // Edit timer modal events
+        const editTimerModal = document.getElementById('editTimerModal');
+        const closeEditTimerBtn = document.getElementById('closeEditTimerModal');
+        const cancelEditTimerBtn = document.getElementById('cancelEditTimer');
+        const editTimerForm = document.getElementById('editTimerForm');
+        if (closeEditTimerBtn) closeEditTimerBtn.addEventListener('click', () => this.closeEditTimerModal());
+        if (cancelEditTimerBtn) cancelEditTimerBtn.addEventListener('click', () => this.closeEditTimerModal());
+        if (editTimerForm) editTimerForm.addEventListener('submit', (e) => this.handleEditTimerSubmit(e));
+        if (editTimerModal) {
+            editTimerModal.addEventListener('click', (e) => {
+                if (e.target.id === 'editTimerModal') this.closeEditTimerModal();
+            });
+        }
+
         // Delegated actions inside tasks list (avoid inline handlers)
         const tasksList = document.getElementById('tasksList');
         tasksList.addEventListener('click', (e) => {
@@ -84,6 +99,9 @@ class TaskManager {
                     break;
                 case 'reset-timer':
                     this.resetTimer(taskId);
+                    break;
+                case 'edit-timer':
+                    this.openEditTimerModal(taskId);
                     break;
                 case 'export-task-note':
                     this.exportServiceNoteForTask(taskId);
@@ -421,6 +439,7 @@ class TaskManager {
             // Timer controls
             const toggleBtn = card.querySelector('.timer-controls .btn:nth-child(1)');
             const resetBtn = card.querySelector('.timer-controls .btn:nth-child(2)');
+            const editBtn = card.querySelector('.timer-controls .btn:nth-child(3)');
             if (toggleBtn) {
                 toggleBtn.dataset.action = 'toggle-timer';
                 toggleBtn.dataset.taskId = taskId;
@@ -428,6 +447,10 @@ class TaskManager {
             if (resetBtn) {
                 resetBtn.dataset.action = 'reset-timer';
                 resetBtn.dataset.taskId = taskId;
+            }
+            if (editBtn) {
+                editBtn.dataset.action = 'edit-timer';
+                editBtn.dataset.taskId = taskId;
             }
         });
     }
@@ -479,6 +502,7 @@ class TaskManager {
                     <div class="timer-controls">
                         <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" data-action="toggle-timer" data-task-id="${task.id}">${isTimerRunning ? '⏸️' : '▶️'}</button>
                         <button class="btn btn-small btn-secondary" data-action="reset-timer" data-task-id="${task.id}">🔄</button>
+                        <button class="btn btn-small" title="Editar tempo" data-action="edit-timer" data-task-id="${task.id}">✏️</button>
                     </div>
                     ${task.hourlyRate && task.hourlyRate > 0 ? `
                     <div class="task-cost">
@@ -531,6 +555,81 @@ class TaskManager {
         task.actualHours = 0;
         this.updateTask(taskId, { actualHours: 0 });
         this.renderTasks();
+    }
+
+    openEditTimerModal(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        this.currentEditingTimerTaskId = taskId;
+        const currentSeconds = Math.round((task.actualHours || 0) * 3600);
+        const input = document.getElementById('editTimerInput');
+        const helper = document.getElementById('editTimerHelper');
+        if (input) input.value = this.formatTime(currentSeconds);
+        if (helper) helper.textContent = `Atual: ${this.formatTime(currentSeconds)}`;
+        const modal = document.getElementById('editTimerModal');
+        if (modal) modal.style.display = 'block';
+    }
+
+    closeEditTimerModal() {
+        const modal = document.getElementById('editTimerModal');
+        if (modal) modal.style.display = 'none';
+        this.currentEditingTimerTaskId = null;
+    }
+
+    handleEditTimerSubmit(e) {
+        if (e) e.preventDefault();
+        const taskId = this.currentEditingTimerTaskId;
+        if (!taskId) return this.closeEditTimerModal();
+        const inputEl = document.getElementById('editTimerInput');
+        const val = inputEl ? inputEl.value : '';
+        const seconds = this.parseTimeInput(val);
+        if (seconds == null || isNaN(seconds) || seconds < 0) {
+            alert('Entrada inválida. Use HH:MM:SS, HH:MM ou horas decimais.');
+            return;
+        }
+
+        // Atualizar task e timer
+        const hours = seconds / 3600;
+        this.updateTask(taskId, { actualHours: hours });
+
+        let timer = this.timers.get(taskId);
+        if (!timer) {
+            timer = { startTime: null, elapsed: 0, isRunning: false };
+            this.timers.set(taskId, timer);
+        }
+        if (timer.isRunning) {
+            timer.elapsed = seconds;
+            timer.startTime = Date.now();
+        } else {
+            timer.elapsed = seconds;
+            timer.startTime = null;
+        }
+
+        this.closeEditTimerModal();
+        this.renderTasks();
+    }
+
+    parseTimeInput(input) {
+        if (!input) return null;
+        const s = String(input).trim();
+        // Try HH:MM:SS or HH:MM
+        const parts = s.split(':').map(x => x.trim());
+        if (parts.length === 3) {
+            const [h, m, sec] = parts.map(n => Number(n));
+            if ([h, m, sec].some(n => Number.isNaN(n))) return null;
+            if (m < 0 || m > 59 || sec < 0 || sec > 59) return null;
+            return h * 3600 + m * 60 + sec;
+        }
+        if (parts.length === 2) {
+            const [h, m] = parts.map(n => Number(n));
+            if ([h, m].some(n => Number.isNaN(n))) return null;
+            if (m < 0 || m > 59) return null;
+            return h * 3600 + m * 60;
+        }
+        // Try decimal hours (accept comma or dot)
+        const asDecimal = Number(s.replace(',', '.'));
+        if (Number.isNaN(asDecimal)) return null;
+        return Math.round(asDecimal * 3600);
     }
 
     updateTimerDisplay() {

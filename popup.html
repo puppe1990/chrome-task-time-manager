@@ -200,6 +200,27 @@
         </div>
     </div>
 
+    <!-- Edit Timer Modal -->
+    <div id="editTimerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Tempo da Tarefa</h2>
+                <button id="closeEditTimerModal" class="close-btn">&times;</button>
+            </div>
+            <form id="editTimerForm">
+                <div class="form-group">
+                    <label for="editTimerInput">Tempo (HH:MM:SS, HH:MM ou horas decimais)</label>
+                    <input type="text" id="editTimerInput" placeholder="Ex.: 01:30:00 ou 1,5" />
+                    <small id="editTimerHelper" style="color:#666; display:block; margin-top:6px;"></small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancelEditTimer" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="saveEditTimer" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 </html>
