@@ -459,6 +459,10 @@ class TaskManager {
                         <button class="btn btn-small ${isTimerRunning ? 'btn-warning' : 'btn-success'}" data-action="toggle-timer" data-task-id="${task.id}">${isTimerRunning ? '⏸️' : '▶️'}</button>
                         <button class="btn btn-small btn-secondary" data-action="reset-timer" data-task-id="${task.id}">🔄</button>
                     </div>
+                    ${task.hourlyRate && task.hourlyRate > 0 ? `
+                    <div class="task-cost">
+                        Custo: <span id="cost-${task.id}">${this.formatCurrency((task.actualHours || 0) * task.hourlyRate)}</span>
+                    </div>` : ''}
                 </div>
             </div>
         `;
@@ -516,6 +520,16 @@ class TaskManager {
                 if (display) {
                     display.textContent = this.formatTime(elapsed);
                 }
+                // Update cost in real-time if applicable
+                const costEl = document.getElementById(`cost-${taskId}`);
+                if (costEl) {
+                    const task = this.tasks.find(t => t.id === taskId);
+                    if (task && typeof task.hourlyRate === 'number' && task.hourlyRate > 0) {
+                        const hours = elapsed / 3600;
+                        const cost = hours * task.hourlyRate;
+                        costEl.textContent = this.formatCurrency(cost);
+                    }
+                }
             }
         });
     }
@@ -525,6 +539,15 @@ class TaskManager {
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    formatCurrency(value) {
+        try {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        } catch (e) {
+            // Fallback simples
+            return `R$ ${value.toFixed(2)}`;
+        }
     }
 
     // Statistics

@@ -262,9 +262,10 @@ body {
     border-radius: 6px;
     padding: 8px 12px;
     margin-bottom: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 6px 8px;
 }
 
 .timer-display {
@@ -277,6 +278,12 @@ body {
 .timer-controls {
     display: flex;
     gap: 4px;
+}
+
+.task-cost {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: #333;
 }
 
 /* Statistics */
