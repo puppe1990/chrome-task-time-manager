@@ -6,6 +6,7 @@ class TaskManager {
         this.currentEditingTask = null;
         this.timers = new Map(); // Para armazenar timers ativos
         this.currentEditingTimerTaskId = null;
+        this.justClosedTaskModalAt = 0; // evita reabrir modal por clique embaixo
         this.init();
     }
 
@@ -77,6 +78,10 @@ class TaskManager {
         // Delegated actions inside tasks list (avoid inline handlers)
         const tasksList = document.getElementById('tasksList');
         tasksList.addEventListener('click', (e) => {
+            // Ignora clique imediatamente após fechar o modal (evita "click-through")
+            if (this.justClosedTaskModalAt && (Date.now() - this.justClosedTaskModalAt) < 400) {
+                return;
+            }
             const btn = e.target.closest('button');
             if (!btn || !tasksList.contains(btn)) return;
             const action = btn.dataset.action;
@@ -385,7 +390,9 @@ class TaskManager {
     }
 
     closeTaskModal() {
-        document.getElementById('taskModal').style.display = 'none';
+        const modal = document.getElementById('taskModal');
+        if (modal) modal.style.display = 'none';
+        this.justClosedTaskModalAt = Date.now();
         this.currentEditingTask = null;
     }
 
@@ -395,10 +402,12 @@ class TaskManager {
         const formData = {
             title: document.getElementById('taskTitle').value.trim(),
             description: document.getElementById('taskDescription').value.trim(),
-            estimatedHours: document.getElementById('estimatedHours').value,
             deadline: document.getElementById('taskDeadline').value,
             status: document.getElementById('taskStatus').value
         };
+        // Numeric fields parsing
+        const estVal = parseFloat(document.getElementById('estimatedHours').value);
+        formData.estimatedHours = isNaN(estVal) ? 0 : estVal;
 
         // Project selection
         const projectSelect = document.getElementById('projectSelect');
@@ -733,8 +742,8 @@ class TaskManager {
         ).length;
         const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        const totalEstimated = this.tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
-        const totalActual = this.tasks.reduce((sum, t) => sum + t.actualHours, 0);
+        const totalEstimated = this.tasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
+        const totalActual = this.tasks.reduce((sum, t) => sum + (Number(t.actualHours) || 0), 0);
         const efficiency = totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : 0;
 
         document.getElementById('totalTasks').textContent = total;
