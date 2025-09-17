@@ -831,6 +831,25 @@ class TaskManager {
                 }
             }
         });
+
+        // Update total earnings live
+        const earningsEl = document.getElementById('totalEarnings');
+        if (earningsEl) {
+            let total = 0;
+            const now = Date.now();
+            this.tasks.forEach(t => {
+                const rate = Number(t.hourlyRate) || 0;
+                if (rate <= 0) return;
+                const timer = this.timers.get(t.id);
+                let hours = Number(t.actualHours) || 0;
+                if (timer && timer.isRunning) {
+                    const elapsed = timer.elapsed + Math.floor((now - timer.startTime) / 1000);
+                    hours = elapsed / 3600;
+                }
+                total += hours * rate;
+            });
+            earningsEl.textContent = this.formatCurrency(total);
+        }
     }
 
     formatTime(seconds) {
@@ -862,6 +881,12 @@ class TaskManager {
         const totalEstimated = this.tasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
         const totalActual = this.tasks.reduce((sum, t) => sum + (Number(t.actualHours) || 0), 0);
         const efficiency = totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : 0;
+        const totalEarnings = this.tasks.reduce((sum, t) => {
+            const hours = Number(t.actualHours) || 0;
+            const rate = Number(t.hourlyRate) || 0;
+            if (rate <= 0) return sum;
+            return sum + hours * rate;
+        }, 0);
 
         document.getElementById('totalTasks').textContent = total;
         document.getElementById('completedTasks').textContent = completed;
@@ -871,6 +896,8 @@ class TaskManager {
         document.getElementById('totalEstimated').textContent = `${totalEstimated.toFixed(1)}h`;
         document.getElementById('totalActual').textContent = `${totalActual.toFixed(1)}h`;
         document.getElementById('efficiency').textContent = `${efficiency}%`;
+        const earningsEl = document.getElementById('totalEarnings');
+        if (earningsEl) earningsEl.textContent = this.formatCurrency(totalEarnings);
     }
 
     updateProjectFilter() {
