@@ -7,6 +7,9 @@ class TaskManager {
         this.timers = new Map(); // Para armazenar timers ativos
         this.currentEditingTimerTaskId = null;
         this.justClosedTaskModalAt = 0; // evita reabrir modal por clique embaixo
+        this.sortOption = 'created_desc'; // preferência de ordenação da lista
+        this.statusFilterValue = '';
+        this.projectFilterValue = '';
         this.init();
     }
 
@@ -15,6 +18,7 @@ class TaskManager {
         // Restaurar timers que estavam em execução previamente
         await this.loadRunningTimers();
         await this.loadProjects();
+        await this.loadPreferences(); // carregar preferências (inclui sort) antes de ligar eventos
         this.setupEventListeners();
         this.renderTasks();
         this.updateStats();
@@ -40,9 +44,28 @@ class TaskManager {
         }
 
         // Filters
-        document.getElementById('statusFilter').addEventListener('change', () => this.renderTasks());
+        const statusFilterEl = document.getElementById('statusFilter');
+        statusFilterEl.addEventListener('change', async (e) => {
+            this.statusFilterValue = e.target.value || '';
+            await this.saveFilterOptions();
+            this.renderTasks();
+        });
         const projectFilterEl = document.getElementById('projectFilter');
-        if (projectFilterEl) projectFilterEl.addEventListener('change', () => this.renderTasks());
+        if (projectFilterEl) projectFilterEl.addEventListener('change', async (e) => {
+            this.projectFilterValue = e.target.value || '';
+            await this.saveFilterOptions();
+            this.renderTasks();
+        });
+        const sortEl = document.getElementById('sortBy');
+        if (sortEl) {
+            // garantir valor inicial se salvo
+            sortEl.value = this.sortOption || 'created_desc';
+            sortEl.addEventListener('change', async (e) => {
+                this.sortOption = e.target.value;
+                await this.saveSortOption();
+                this.renderTasks();
+            });
+        }
 
         // Close modal when clicking outside
         document.getElementById('taskModal').addEventListener('click', (e) => {
@@ -174,6 +197,43 @@ class TaskManager {
         if (importBtn && importInput) {
             importBtn.addEventListener('click', () => importInput.click());
             importInput.addEventListener('change', (e) => this.handleImportFile(e.target.files[0]));
+        }
+    }
+
+    async loadPreferences() {
+        try {
+            const result = await chrome.storage.local.get(['taskSortOption', 'taskStatusFilter', 'taskProjectFilter']);
+            if (result && result.taskSortOption) this.sortOption = result.taskSortOption;
+            if (result && typeof result.taskStatusFilter !== 'undefined') this.statusFilterValue = result.taskStatusFilter || '';
+            if (result && typeof result.taskProjectFilter !== 'undefined') this.projectFilterValue = result.taskProjectFilter || '';
+
+            const sortEl = document.getElementById('sortBy');
+            if (sortEl) sortEl.value = this.sortOption;
+            const statusEl = document.getElementById('statusFilter');
+            if (statusEl) statusEl.value = this.statusFilterValue || '';
+            const projEl = document.getElementById('projectFilter');
+            if (projEl) projEl.value = this.projectFilterValue || '';
+        } catch (err) {
+            console.warn('Não foi possível carregar preferências:', err);
+        }
+    }
+
+    async saveSortOption() {
+        try {
+            await chrome.storage.local.set({ taskSortOption: this.sortOption });
+        } catch (err) {
+            console.warn('Não foi possível salvar preferência de ordenação:', err);
+        }
+    }
+
+    async saveFilterOptions() {
+        try {
+            await chrome.storage.local.set({
+                taskStatusFilter: this.statusFilterValue || '',
+                taskProjectFilter: this.projectFilterValue || ''
+            });
+        } catch (err) {
+            console.warn('Não foi possível salvar filtros:', err);
         }
     }
 
@@ -464,6 +524,9 @@ class TaskManager {
             filteredTasks = filteredTasks.filter(task => task.projectId === projectFilter);
         }
 
+        // Ordenação
+        filteredTasks = this.sortTasks(filteredTasks);
+
         if (filteredTasks.length === 0) {
             tasksList.innerHTML = `
                 <div class="empty-state">
@@ -477,6 +540,56 @@ class TaskManager {
 
         tasksList.innerHTML = filteredTasks.map(task => this.createTaskCard(task)).join('');
         this.bindTaskCardEvents();
+    }
+
+    sortTasks(tasks) {
+        const opt = this.sortOption || 'created_desc';
+        const statusOrder = {
+            'Not Started': 0,
+            'In Progress': 1,
+            'On Hold': 2,
+            'Completed': 3
+        };
+        const getDate = (d) => d ? new Date(d).getTime() : null;
+        const getProjectName = (t) => (this.getProjectName(t.projectId) || '').toLowerCase();
+        const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+
+        const arr = [...tasks];
+        arr.sort((a, b) => {
+            switch (opt) {
+                case 'created_asc':
+                    return (getDate(a.createdAt) || 0) - (getDate(b.createdAt) || 0);
+                case 'created_desc':
+                    return (getDate(b.createdAt) || 0) - (getDate(a.createdAt) || 0);
+                case 'deadline_asc': {
+                    const ad = getDate(a.deadline);
+                    const bd = getDate(b.deadline);
+                    if (ad === null && bd === null) return 0;
+                    if (ad === null) return 1; // sem prazo vai para o fim
+                    if (bd === null) return -1;
+                    return ad - bd;
+                }
+                case 'deadline_desc': {
+                    const ad = getDate(a.deadline);
+                    const bd = getDate(b.deadline);
+                    if (ad === null && bd === null) return 0;
+                    if (ad === null) return 1;
+                    if (bd === null) return -1;
+                    return bd - ad;
+                }
+                case 'title_asc':
+                    return collator.compare(a.title || '', b.title || '');
+                case 'title_desc':
+                    return collator.compare(b.title || '', a.title || '');
+                case 'status':
+                    return (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99);
+                case 'project':
+                    return collator.compare(getProjectName(a), getProjectName(b));
+                default:
+                    return (getDate(b.createdAt) || 0) - (getDate(a.createdAt) || 0);
+            }
+        });
+        return arr;
     }
 
     bindTaskCardEvents() {
@@ -772,8 +885,13 @@ class TaskManager {
             option.textContent = p.name;
             projectFilter.appendChild(option);
         });
-        if (this.projects.some(p => p.id === currentValue)) {
+        // Preferir a preferência salva; senão, manter o valor atual se ainda válido
+        if (this.projectFilterValue && this.projects.some(p => p.id === this.projectFilterValue)) {
+            projectFilter.value = this.projectFilterValue;
+        } else if (this.projects.some(p => p.id === currentValue)) {
             projectFilter.value = currentValue;
+        } else {
+            projectFilter.value = '';
         }
     }
 
