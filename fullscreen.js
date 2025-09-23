@@ -29,6 +29,9 @@ class KanbanTaskManager {
         // Header buttons
         document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
         document.getElementById('addProjectBtn').addEventListener('click', () => this.openProjectModal());
+        document.getElementById('projectsBtn').addEventListener('click', () => this.toggleProjectsPanel());
+        document.getElementById('closeProjectsBtn').addEventListener('click', () => this.closeProjectsPanel());
+        document.getElementById('addProjectFromFullscreenBtn').addEventListener('click', () => this.openProjectModal());
         document.getElementById('exportBtn').addEventListener('click', () => this.openExportModal());
         document.getElementById('statsBtn').addEventListener('click', () => this.toggleStatsPanel());
         document.getElementById('closeStatsBtn').addEventListener('click', () => this.closeStatsPanel());
@@ -618,6 +621,7 @@ class KanbanTaskManager {
         this.saveProjects();
         this.updateProjectFilter();
         this.populateProjectSelect();
+        this.renderProjects();
         this.closeProjectModal();
     }
 
@@ -666,6 +670,118 @@ class KanbanTaskManager {
     closeStatsPanel() {
         const panel = document.getElementById('statsPanel');
         panel.classList.add('hidden');
+    }
+
+    // Projects Panel
+    toggleProjectsPanel() {
+        const panel = document.getElementById('projectsPanel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) {
+            this.renderProjects();
+        }
+    }
+
+    closeProjectsPanel() {
+        const panel = document.getElementById('projectsPanel');
+        panel.classList.add('hidden');
+    }
+
+    // Projects Management
+    renderProjects() {
+        const container = document.getElementById('projectsList');
+        if (!container) return;
+        
+        if (this.projects.length === 0) {
+            container.innerHTML = '<div class="empty-projects"><p>Nenhum projeto cadastrado.</p><p>Crie seu primeiro projeto para começar!</p></div>';
+            return;
+        }
+        
+        container.innerHTML = this.projects.map(project => this.createProjectCard(project)).join('');
+        this.bindProjectCardEvents();
+    }
+
+    createProjectCard(project) {
+        const taskCount = this.tasks.filter(t => t.projectId === project.id).length;
+        const completedTasks = this.tasks.filter(t => t.projectId === project.id && t.status === 'Completed').length;
+        const inProgressTasks = this.tasks.filter(t => t.projectId === project.id && t.status === 'In Progress').length;
+        
+        // Calculate project statistics
+        const projectTasks = this.tasks.filter(t => t.projectId === project.id);
+        const totalEstimatedHours = projectTasks.reduce((sum, t) => sum + (Number(t.estimatedHours) || 0), 0);
+        const totalActualHours = projectTasks.reduce((sum, t) => sum + (Number(t.actualHours) || 0), 0);
+        const totalValue = projectTasks.reduce((sum, t) => {
+            const hours = Number(t.actualHours) || 0;
+            const rate = Number(t.hourlyRate) || 0;
+            return sum + (hours * rate);
+        }, 0);
+
+        return `
+            <div class="project-card" data-project-id="${project.id}">
+                <div class="project-header">
+                    <div>
+                        <div class="project-title">${this.escapeHtml(project.name)}</div>
+                        <div class="project-task-count">${taskCount} tarefa(s)</div>
+                    </div>
+                    <div class="project-actions">
+                        <button class="btn btn-small btn-success" title="Editar projeto" data-action="edit-project" data-project-id="${project.id}">✏️</button>
+                        <button class="btn btn-small btn-secondary" title="Excluir projeto" data-action="delete-project" data-project-id="${project.id}">🗑️</button>
+                    </div>
+                </div>
+                
+                <div class="project-meta">
+                    <span>Concluídas: ${completedTasks}</span>
+                    <span>Em progresso: ${inProgressTasks}</span>
+                </div>
+                
+                <div class="project-description">
+                    <strong>Horas:</strong> ${this.formatTime(Math.round(totalActualHours * 3600))} / ${this.formatTime(Math.round(totalEstimatedHours * 3600))}
+                    ${totalValue > 0 ? `<br><strong>Valor:</strong> ${this.formatCurrency(totalValue)}` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    bindProjectCardEvents() {
+        const container = document.getElementById('projectsList');
+        if (!container) return;
+        
+        container.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            
+            const action = btn.dataset.action;
+            const projectId = btn.dataset.projectId;
+            
+            switch (action) {
+                case 'edit-project':
+                    const project = this.projects.find(p => p.id === projectId);
+                    if (project) this.openProjectModal(project);
+                    break;
+                case 'delete-project':
+                    this.deleteProject(projectId);
+                    break;
+            }
+        });
+    }
+
+    async deleteProject(projectId) {
+        const project = this.projects.find(p => p.id === projectId);
+        if (!project) return;
+        
+        const inUse = this.tasks.some(t => t.projectId === projectId);
+        if (inUse) {
+            alert('Não é possível excluir um projeto com tarefas associadas.');
+            return;
+        }
+        
+        const confirmDelete = confirm(`Tem certeza que deseja excluir o projeto "${project.name}"?\nEsta ação não pode ser desfeita.`);
+        if (!confirmDelete) return;
+        
+        this.projects = this.projects.filter(p => p.id !== projectId);
+        await this.saveProjects();
+        this.updateProjectFilter();
+        this.renderProjects();
+        this.renderKanbanBoard();
     }
 
     updateStats() {

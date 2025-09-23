@@ -436,11 +436,41 @@ body {
     flex-direction: column;
 }
 
+/* Projects Panel */
+.projects-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+}
+
 .stats-panel:not(.hidden) {
     transform: translateX(0);
 }
 
+.projects-panel:not(.hidden) {
+    transform: translateX(0);
+}
+
 .stats-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.projects-header {
     padding: 20px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
@@ -459,6 +489,95 @@ body {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
+}
+
+.projects-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.projects-actions {
+    margin-bottom: 20px;
+}
+
+.projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.project-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+.project-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.project-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.project-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.project-task-count {
+    background: #667eea;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.project-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.project-description {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.empty-projects {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #999;
+    font-size: 14px;
+    text-align: center;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    margin: 8px 0;
 }
 
 .stats-grid {
@@ -649,6 +768,10 @@ textarea {
     }
     
     .stats-panel {
+        width: 100%;
+    }
+    
+    .projects-panel {
         width: 100%;
     }
 }

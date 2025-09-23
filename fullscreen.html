@@ -20,6 +20,7 @@
                     </select>
                     <button id="addTaskBtn" class="btn btn-primary">+ Nova Tarefa</button>
                     <button id="addProjectBtn" class="btn btn-secondary">+ Projeto</button>
+                    <button id="projectsBtn" class="btn btn-stats">📁 Projetos</button>
                     <button id="exportBtn" class="btn btn-export">📤 Exportar</button>
                     <button id="statsBtn" class="btn btn-stats">📊 Estatísticas</button>
                 </div>
@@ -28,6 +29,22 @@
 
         <!-- Main Content -->
         <main class="main-content">
+            <!-- Projects Panel (Hidden by default) -->
+            <div id="projectsPanel" class="projects-panel hidden">
+                <div class="projects-header">
+                    <h2>📁 Projetos</h2>
+                    <button id="closeProjectsBtn" class="btn-close" title="Fechar projetos">✕</button>
+                </div>
+                <div class="projects-content">
+                    <div class="projects-actions">
+                        <button id="addProjectFromFullscreenBtn" class="btn btn-primary">+ Novo Projeto</button>
+                    </div>
+                    <div id="projectsList" class="projects-list">
+                        <!-- Projects will be added here -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Kanban Board -->
             <div class="kanban-board" id="kanbanBoard">
                 <div class="kanban-column" data-status="Not Started">
