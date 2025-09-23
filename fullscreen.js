@@ -8,6 +8,7 @@ class KanbanTaskManager {
         this.currentEditingTimerTaskId = null;
         this.projectFilterValue = '';
         this.draggedTask = null;
+        this.selectedTaskIds = new Set(); // Para controlar quais tarefas estão selecionadas para exportação
         this.init();
     }
 
@@ -87,20 +88,46 @@ class KanbanTaskManager {
 
         // Export filters change
         document.getElementById('exportProjectFilter').addEventListener('change', () => {
+            this.renderTaskSelectionList();
             this.updateExportSummary();
             this.updateExportPreview();
         });
         document.getElementById('exportStatusFilter').addEventListener('change', () => {
+            this.renderTaskSelectionList();
             this.updateExportSummary();
             this.updateExportPreview();
         });
         document.getElementById('exportDateFrom').addEventListener('change', () => {
+            this.renderTaskSelectionList();
             this.updateExportSummary();
             this.updateExportPreview();
         });
         document.getElementById('exportDateTo').addEventListener('change', () => {
+            this.renderTaskSelectionList();
             this.updateExportSummary();
             this.updateExportPreview();
+        });
+
+        // Task selection controls
+        document.getElementById('selectAllTasksBtn').addEventListener('click', () => this.selectAllTasks());
+        document.getElementById('selectNoneTasksBtn').addEventListener('click', () => this.selectNoneTasks());
+        
+        // Task selection list (delegated events)
+        document.getElementById('taskSelectionList').addEventListener('change', (e) => {
+            if (e.target.classList.contains('task-checkbox')) {
+                this.onTaskSelectionChange(e.target);
+            }
+        });
+        
+        document.getElementById('taskSelectionList').addEventListener('click', (e) => {
+            const item = e.target.closest('.task-selection-item');
+            if (item && !e.target.classList.contains('task-checkbox')) {
+                const checkbox = item.querySelector('.task-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    this.onTaskSelectionChange(checkbox);
+                }
+            }
         });
 
         // Setup drag and drop for Kanban columns
@@ -677,6 +704,7 @@ class KanbanTaskManager {
     openExportModal() {
         const modal = document.getElementById('exportModal');
         this.populateExportProjectFilter();
+        this.renderTaskSelectionList();
         this.updateExportSummary();
         modal.style.display = 'block';
     }
@@ -685,6 +713,8 @@ class KanbanTaskManager {
         const modal = document.getElementById('exportModal');
         modal.style.display = 'none';
         document.getElementById('exportPreview').innerHTML = '<div class="preview-placeholder">Selecione as opções acima para ver o preview</div>';
+        // Clear task selections for next time
+        this.selectedTaskIds.clear();
     }
 
     onExportFormatChange() {
@@ -712,7 +742,7 @@ class KanbanTaskManager {
         });
     }
 
-    getFilteredTasksForExport() {
+    getAvailableTasksForExport() {
         let tasks = [...this.tasks];
         
         // Filter by project
@@ -744,48 +774,53 @@ class KanbanTaskManager {
         return tasks;
     }
 
+    getSelectedTasksForExport() {
+        const availableTasks = this.getAvailableTasksForExport();
+        return availableTasks.filter(task => this.selectedTaskIds.has(task.id));
+    }
+
     updateExportSummary() {
-        const filteredTasks = this.getFilteredTasksForExport();
-        const totalHours = filteredTasks.reduce((sum, task) => sum + (task.actualHours || 0), 0);
-        const totalValue = filteredTasks.reduce((sum, task) => {
+        const selectedTasks = this.getSelectedTasksForExport();
+        const totalHours = selectedTasks.reduce((sum, task) => sum + (task.actualHours || 0), 0);
+        const totalValue = selectedTasks.reduce((sum, task) => {
             const hours = task.actualHours || 0;
             const rate = task.hourlyRate || 0;
             return sum + (hours * rate);
         }, 0);
         
-        document.getElementById('selectedTasksCount').textContent = filteredTasks.length;
+        document.getElementById('selectedTasksCount').textContent = selectedTasks.length;
         document.getElementById('selectedHoursTotal').textContent = `${totalHours.toFixed(1)}h`;
         document.getElementById('selectedValueTotal').textContent = this.formatCurrency(totalValue);
     }
 
     updateExportPreview() {
         const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
-        const filteredTasks = this.getFilteredTasksForExport();
+        const selectedTasks = this.getSelectedTasksForExport();
         const previewEl = document.getElementById('exportPreview');
         
-        if (filteredTasks.length === 0) {
-            previewEl.innerHTML = '<div class="preview-placeholder">Nenhuma tarefa selecionada com os filtros atuais</div>';
+        if (selectedTasks.length === 0) {
+            previewEl.innerHTML = '<div class="preview-placeholder">Nenhuma tarefa selecionada para exportação</div>';
             return;
         }
         
         switch (selectedFormat) {
             case 'html':
-                previewEl.innerHTML = this.generateHTMLPreview(filteredTasks);
+                previewEl.innerHTML = this.generateHTMLPreview(selectedTasks);
                 break;
             case 'csv':
-                previewEl.innerHTML = `<pre>${this.generateCSVContent(filteredTasks)}</pre>`;
+                previewEl.innerHTML = `<pre>${this.generateCSVContent(selectedTasks)}</pre>`;
                 break;
             case 'json':
-                previewEl.innerHTML = `<pre>${this.generateJSONContent(filteredTasks)}</pre>`;
+                previewEl.innerHTML = `<pre>${this.generateJSONContent(selectedTasks)}</pre>`;
                 break;
         }
     }
 
     downloadExport() {
         const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
-        const filteredTasks = this.getFilteredTasksForExport();
+        const selectedTasks = this.getSelectedTasksForExport();
         
-        if (filteredTasks.length === 0) {
+        if (selectedTasks.length === 0) {
             alert('Nenhuma tarefa selecionada para exportação');
             return;
         }
@@ -796,17 +831,17 @@ class KanbanTaskManager {
         
         switch (selectedFormat) {
             case 'html':
-                const htmlContent = this.generateHTMLExport(filteredTasks);
+                const htmlContent = this.generateHTMLExport(selectedTasks);
                 const filename = `ordem-servico-${dateStr}.html`;
                 this.downloadBlob(filename, htmlContent, 'text/html');
                 break;
             case 'csv':
-                const csvContent = this.generateCSVContent(filteredTasks);
+                const csvContent = this.generateCSVContent(selectedTasks);
                 const csvFilename = `relatorio-tarefas-${dateStr}.csv`;
                 this.downloadBlob(csvFilename, csvContent, 'text/csv');
                 break;
             case 'json':
-                const jsonContent = this.generateJSONContent(filteredTasks);
+                const jsonContent = this.generateJSONContent(selectedTasks);
                 const jsonFilename = `backup-tarefas-${dateStr}.json`;
                 this.downloadBlob(jsonFilename, jsonContent, 'application/json');
                 break;
@@ -827,6 +862,80 @@ class KanbanTaskManager {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 0);
+    }
+
+    // Task Selection Management
+    renderTaskSelectionList() {
+        const availableTasks = this.getAvailableTasksForExport();
+        const listEl = document.getElementById('taskSelectionList');
+        
+        if (availableTasks.length === 0) {
+            listEl.innerHTML = '<div class="empty-task-selection">Nenhuma tarefa disponível com os filtros atuais</div>';
+            return;
+        }
+        
+        listEl.innerHTML = availableTasks.map(task => {
+            const projectName = this.getProjectName(task.projectId) || 'Sem projeto';
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            const cost = hours * rate;
+            const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
+            const isSelected = this.selectedTaskIds.has(task.id);
+            
+            return `
+                <div class="task-selection-item ${isSelected ? 'selected' : ''}" data-task-id="${task.id}">
+                    <input type="checkbox" class="task-checkbox" ${isSelected ? 'checked' : ''} data-task-id="${task.id}">
+                    <div class="task-selection-info">
+                        <div class="task-selection-title">${this.escapeHtml(task.title)}</div>
+                        <div class="task-selection-meta">
+                            <span class="task-selection-project">${this.escapeHtml(projectName)}</span>
+                            <span class="task-selection-status ${statusClass}">${this.getStatusText(task.status)}</span>
+                        </div>
+                    </div>
+                    <div class="task-selection-value">
+                        <div class="task-selection-hours">${this.formatTime(Math.round(hours * 3600))}</div>
+                        ${rate > 0 ? `<div class="task-selection-cost">${this.formatCurrency(cost)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Auto-select all tasks if none are selected yet
+        if (this.selectedTaskIds.size === 0) {
+            availableTasks.forEach(task => this.selectedTaskIds.add(task.id));
+            this.renderTaskSelectionList(); // Re-render to show selections
+        }
+    }
+    
+    selectAllTasks() {
+        const availableTasks = this.getAvailableTasksForExport();
+        availableTasks.forEach(task => this.selectedTaskIds.add(task.id));
+        this.renderTaskSelectionList();
+        this.updateExportSummary();
+        this.updateExportPreview();
+    }
+    
+    selectNoneTasks() {
+        this.selectedTaskIds.clear();
+        this.renderTaskSelectionList();
+        this.updateExportSummary();
+        this.updateExportPreview();
+    }
+    
+    onTaskSelectionChange(checkbox) {
+        const taskId = checkbox.dataset.taskId;
+        const item = checkbox.closest('.task-selection-item');
+        
+        if (checkbox.checked) {
+            this.selectedTaskIds.add(taskId);
+            item.classList.add('selected');
+        } else {
+            this.selectedTaskIds.delete(taskId);
+            item.classList.remove('selected');
+        }
+        
+        this.updateExportSummary();
+        this.updateExportPreview();
     }
 
     // Export Content Generators
