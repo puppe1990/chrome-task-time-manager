@@ -28,8 +28,9 @@ class KanbanTaskManager {
         // Header buttons
         document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
         document.getElementById('addProjectBtn').addEventListener('click', () => this.openProjectModal());
+        document.getElementById('exportBtn').addEventListener('click', () => this.openExportModal());
         document.getElementById('statsBtn').addEventListener('click', () => this.toggleStatsPanel());
-        document.getElementById('closeStatsBtn').addEventListener('click', () => this.toggleStatsPanel());
+        document.getElementById('closeStatsBtn').addEventListener('click', () => this.closeStatsPanel());
 
         // Project filter
         const projectFilter = document.getElementById('projectFilter');
@@ -64,6 +65,42 @@ class KanbanTaskManager {
         });
         document.getElementById('editTimerModal').addEventListener('click', (e) => {
             if (e.target.id === 'editTimerModal') this.closeEditTimerModal();
+        });
+
+        // Export Modal events
+        document.getElementById('closeExportModal').addEventListener('click', () => this.closeExportModal());
+        document.getElementById('cancelExportBtn').addEventListener('click', () => this.closeExportModal());
+        document.getElementById('previewExportBtn').addEventListener('click', () => this.updateExportPreview());
+        document.getElementById('downloadExportBtn').addEventListener('click', () => this.downloadExport());
+        document.getElementById('exportModal').addEventListener('click', (e) => {
+            if (e.target.id === 'exportModal') this.closeExportModal();
+        });
+
+        // Export format change
+        document.querySelectorAll('input[name="exportFormat"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                this.onExportFormatChange();
+                this.updateExportSummary();
+                this.updateExportPreview();
+            });
+        });
+
+        // Export filters change
+        document.getElementById('exportProjectFilter').addEventListener('change', () => {
+            this.updateExportSummary();
+            this.updateExportPreview();
+        });
+        document.getElementById('exportStatusFilter').addEventListener('change', () => {
+            this.updateExportSummary();
+            this.updateExportPreview();
+        });
+        document.getElementById('exportDateFrom').addEventListener('change', () => {
+            this.updateExportSummary();
+            this.updateExportPreview();
+        });
+        document.getElementById('exportDateTo').addEventListener('change', () => {
+            this.updateExportSummary();
+            this.updateExportPreview();
         });
 
         // Setup drag and drop for Kanban columns
@@ -599,6 +636,11 @@ class KanbanTaskManager {
         }
     }
 
+    closeStatsPanel() {
+        const panel = document.getElementById('statsPanel');
+        panel.classList.add('hidden');
+    }
+
     updateStats() {
         let tasks = this.tasks;
         if (this.projectFilterValue) {
@@ -629,6 +671,442 @@ class KanbanTaskManager {
         document.getElementById('totalActual').textContent = `${totalActual.toFixed(1)}h`;
         document.getElementById('efficiency').textContent = `${efficiency}%`;
         document.getElementById('totalEarnings').textContent = this.formatCurrency(totalEarnings);
+    }
+
+    // Export Modal Management
+    openExportModal() {
+        const modal = document.getElementById('exportModal');
+        this.populateExportProjectFilter();
+        this.updateExportSummary();
+        modal.style.display = 'block';
+    }
+
+    closeExportModal() {
+        const modal = document.getElementById('exportModal');
+        modal.style.display = 'none';
+        document.getElementById('exportPreview').innerHTML = '<div class="preview-placeholder">Selecione as opções acima para ver o preview</div>';
+    }
+
+    onExportFormatChange() {
+        const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
+        const htmlOnlyElements = document.querySelectorAll('.html-only');
+        
+        htmlOnlyElements.forEach(element => {
+            if (selectedFormat === 'html') {
+                element.classList.remove('hidden');
+            } else {
+                element.classList.add('hidden');
+            }
+        });
+    }
+
+    populateExportProjectFilter() {
+        const select = document.getElementById('exportProjectFilter');
+        select.innerHTML = '<option value="">Todos os Projetos</option>';
+        
+        this.projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.id;
+            option.textContent = project.name;
+            select.appendChild(option);
+        });
+    }
+
+    getFilteredTasksForExport() {
+        let tasks = [...this.tasks];
+        
+        // Filter by project
+        const projectFilter = document.getElementById('exportProjectFilter').value;
+        if (projectFilter) {
+            tasks = tasks.filter(task => task.projectId === projectFilter);
+        }
+        
+        // Filter by status
+        const statusFilter = document.getElementById('exportStatusFilter').value;
+        if (statusFilter) {
+            tasks = tasks.filter(task => task.status === statusFilter);
+        }
+        
+        // Filter by date range
+        const dateFrom = document.getElementById('exportDateFrom').value;
+        const dateTo = document.getElementById('exportDateTo').value;
+        
+        if (dateFrom || dateTo) {
+            tasks = tasks.filter(task => {
+                const taskDate = new Date(task.createdAt);
+                const fromDate = dateFrom ? new Date(dateFrom) : new Date('1900-01-01');
+                const toDate = dateTo ? new Date(dateTo + 'T23:59:59') : new Date('2100-01-01');
+                
+                return taskDate >= fromDate && taskDate <= toDate;
+            });
+        }
+        
+        return tasks;
+    }
+
+    updateExportSummary() {
+        const filteredTasks = this.getFilteredTasksForExport();
+        const totalHours = filteredTasks.reduce((sum, task) => sum + (task.actualHours || 0), 0);
+        const totalValue = filteredTasks.reduce((sum, task) => {
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            return sum + (hours * rate);
+        }, 0);
+        
+        document.getElementById('selectedTasksCount').textContent = filteredTasks.length;
+        document.getElementById('selectedHoursTotal').textContent = `${totalHours.toFixed(1)}h`;
+        document.getElementById('selectedValueTotal').textContent = this.formatCurrency(totalValue);
+    }
+
+    updateExportPreview() {
+        const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
+        const filteredTasks = this.getFilteredTasksForExport();
+        const previewEl = document.getElementById('exportPreview');
+        
+        if (filteredTasks.length === 0) {
+            previewEl.innerHTML = '<div class="preview-placeholder">Nenhuma tarefa selecionada com os filtros atuais</div>';
+            return;
+        }
+        
+        switch (selectedFormat) {
+            case 'html':
+                previewEl.innerHTML = this.generateHTMLPreview(filteredTasks);
+                break;
+            case 'csv':
+                previewEl.innerHTML = `<pre>${this.generateCSVContent(filteredTasks)}</pre>`;
+                break;
+            case 'json':
+                previewEl.innerHTML = `<pre>${this.generateJSONContent(filteredTasks)}</pre>`;
+                break;
+        }
+    }
+
+    downloadExport() {
+        const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
+        const filteredTasks = this.getFilteredTasksForExport();
+        
+        if (filteredTasks.length === 0) {
+            alert('Nenhuma tarefa selecionada para exportação');
+            return;
+        }
+        
+        const timestamp = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${timestamp.getFullYear()}${pad(timestamp.getMonth()+1)}${pad(timestamp.getDate())}-${pad(timestamp.getHours())}${pad(timestamp.getMinutes())}`;
+        
+        switch (selectedFormat) {
+            case 'html':
+                const htmlContent = this.generateHTMLExport(filteredTasks);
+                const filename = `ordem-servico-${dateStr}.html`;
+                this.downloadBlob(filename, htmlContent, 'text/html');
+                break;
+            case 'csv':
+                const csvContent = this.generateCSVContent(filteredTasks);
+                const csvFilename = `relatorio-tarefas-${dateStr}.csv`;
+                this.downloadBlob(csvFilename, csvContent, 'text/csv');
+                break;
+            case 'json':
+                const jsonContent = this.generateJSONContent(filteredTasks);
+                const jsonFilename = `backup-tarefas-${dateStr}.json`;
+                this.downloadBlob(jsonFilename, jsonContent, 'application/json');
+                break;
+        }
+        
+        this.closeExportModal();
+    }
+
+    downloadBlob(filename, content, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    // Export Content Generators
+    generateHTMLPreview(tasks) {
+        const now = new Date();
+        const brDate = now.toLocaleDateString('pt-BR');
+        const totalHours = tasks.reduce((sum, task) => sum + (task.actualHours || 0), 0);
+        const totalValue = tasks.reduce((sum, task) => {
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            return sum + (hours * rate);
+        }, 0);
+
+        const taskRows = tasks.map(task => {
+            const projectName = this.getProjectName(task.projectId) || 'Sem projeto';
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            const cost = hours * rate;
+            const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString('pt-BR') : '-';
+            
+            return `
+                <tr>
+                    <td>${this.escapeHtml(task.title)}</td>
+                    <td>${this.escapeHtml(projectName)}</td>
+                    <td>${this.getStatusText(task.status)}</td>
+                    <td>${deadline}</td>
+                    <td class="right">${this.formatTime(Math.round(hours * 3600))}</td>
+                    <td class="right">${rate > 0 ? this.formatCurrency(rate) : '—'}</td>
+                    <td class="right">${this.formatCurrency(cost)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <div class="preview-html">
+                <h1>Ordem de Serviço</h1>
+                <div style="color: #666; font-size: 12px; margin-bottom: 16px;">Emitida em ${brDate}</div>
+                
+                <h2>Resumo dos Serviços</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tarefa</th>
+                            <th>Projeto</th>
+                            <th>Status</th>
+                            <th>Prazo</th>
+                            <th class="right">Horas</th>
+                            <th class="right">Valor/h</th>
+                            <th class="right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${taskRows}
+                        <tr style="font-weight: bold; border-top: 2px solid #333;">
+                            <td colspan="4">TOTAL</td>
+                            <td class="right">${this.formatTime(Math.round(totalHours * 3600))}</td>
+                            <td></td>
+                            <td class="right">${this.formatCurrency(totalValue)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    generateHTMLExport(tasks) {
+        const now = new Date();
+        const brDate = now.toLocaleDateString('pt-BR');
+        const companyName = document.getElementById('companyName').value || 'Empresa';
+        const companyCnpj = document.getElementById('companyCnpj').value;
+        const companyEmail = document.getElementById('companyEmail').value;
+        const companyPhone = document.getElementById('companyPhone').value;
+        const exportNotes = document.getElementById('exportNotes').value;
+        
+        const totalHours = tasks.reduce((sum, task) => sum + (task.actualHours || 0), 0);
+        const totalValue = tasks.reduce((sum, task) => {
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            return sum + (hours * rate);
+        }, 0);
+
+        const taskRows = tasks.map(task => {
+            const projectName = this.getProjectName(task.projectId) || 'Sem projeto';
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            const cost = hours * rate;
+            const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString('pt-BR') : '-';
+            const description = task.description ? this.escapeHtml(task.description) : '—';
+            
+            return `
+                <tr>
+                    <td>${this.escapeHtml(task.title)}</td>
+                    <td>${this.escapeHtml(projectName)}</td>
+                    <td>${this.getStatusText(task.status)}</td>
+                    <td>${deadline}</td>
+                    <td class="right">${this.formatTime(Math.round(hours * 3600))}</td>
+                    <td class="right">${rate > 0 ? this.formatCurrency(rate) : '—'}</td>
+                    <td class="right">${this.formatCurrency(cost)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordem de Serviço - ${this.escapeHtml(companyName)}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 24px; color: #222; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 2px solid #333; }
+        .company-info { flex: 1; }
+        .company-info h1 { margin: 0 0 8px; font-size: 24px; color: #333; }
+        .company-info .details { color: #666; font-size: 14px; }
+        .document-info { text-align: right; }
+        .document-info h2 { margin: 0 0 8px; font-size: 20px; color: #333; }
+        .document-info .date { color: #666; font-size: 14px; }
+        h3 { margin: 24px 0 12px; font-size: 18px; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px 8px; text-align: left; font-size: 14px; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .right { text-align: right; }
+        .total-row { font-weight: bold; background: #f0f8ff; border-top: 2px solid #333; }
+        .notes { background: #f9f9f9; padding: 16px; border-radius: 8px; margin-top: 24px; }
+        .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
+        @media print { 
+            .no-print { display: none; } 
+            body { margin: 0; }
+            .header { page-break-after: avoid; }
+        }
+    </style>
+    <script>
+        function printDocument() { window.print(); }
+    </script>
+</head>
+<body>
+    <div class="no-print" style="text-align: right; margin-bottom: 16px;">
+        <button onclick="printDocument()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">🖨️ Imprimir/Salvar PDF</button>
+    </div>
+    
+    <div class="header">
+        <div class="company-info">
+            <h1>${this.escapeHtml(companyName)}</h1>
+            <div class="details">
+                ${companyCnpj ? `<div>CNPJ: ${this.escapeHtml(companyCnpj)}</div>` : ''}
+                ${companyEmail ? `<div>E-mail: ${this.escapeHtml(companyEmail)}</div>` : ''}
+                ${companyPhone ? `<div>Telefone: ${this.escapeHtml(companyPhone)}</div>` : ''}
+            </div>
+        </div>
+        <div class="document-info">
+            <h2>ORDEM DE SERVIÇO</h2>
+            <div class="date">Emitida em ${brDate}</div>
+            <div class="date">Total de ${tasks.length} serviço(s)</div>
+        </div>
+    </div>
+
+    <h3>📋 Detalhamento dos Serviços</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Descrição do Serviço</th>
+                <th>Projeto</th>
+                <th>Status</th>
+                <th>Prazo</th>
+                <th class="right">Horas Trabalhadas</th>
+                <th class="right">Valor/Hora</th>
+                <th class="right">Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${taskRows}
+            <tr class="total-row">
+                <td colspan="4"><strong>TOTAL GERAL</strong></td>
+                <td class="right"><strong>${this.formatTime(Math.round(totalHours * 3600))}</strong></td>
+                <td class="right">—</td>
+                <td class="right"><strong>${this.formatCurrency(totalValue)}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    ${exportNotes ? `
+    <div class="notes">
+        <h3>📝 Observações</h3>
+        <p>${this.escapeHtml(exportNotes).replace(/\n/g, '<br>')}</p>
+    </div>
+    ` : ''}
+
+    <div class="footer">
+        <p>Documento gerado pelo Task Time Manager em ${brDate}</p>
+        <p>Este documento é válido como comprovante de serviços prestados</p>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    generateCSVContent(tasks) {
+        const headers = [
+            'Tarefa',
+            'Projeto', 
+            'Status',
+            'Criado em',
+            'Prazo',
+            'Horas Estimadas',
+            'Horas Reais',
+            'Valor por Hora',
+            'Valor Total',
+            'Descrição'
+        ];
+        
+        const rows = tasks.map(task => {
+            const projectName = this.getProjectName(task.projectId) || 'Sem projeto';
+            const hours = task.actualHours || 0;
+            const rate = task.hourlyRate || 0;
+            const cost = hours * rate;
+            const createdAt = new Date(task.createdAt).toLocaleDateString('pt-BR');
+            const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString('pt-BR') : '';
+            const status = this.getStatusText(task.status);
+            
+            return [
+                `"${(task.title || '').replace(/"/g, '""')}"`,
+                `"${projectName.replace(/"/g, '""')}"`,
+                `"${status}"`,
+                `"${createdAt}"`,
+                `"${deadline}"`,
+                `"${(task.estimatedHours || 0).toString().replace('.', ',')}"`,
+                `"${hours.toString().replace('.', ',')}"`,
+                `"${rate.toString().replace('.', ',')}"`,
+                `"${cost.toString().replace('.', ',')}"`,
+                `"${(task.description || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+            ];
+        });
+        
+        const csvContent = [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
+        return '\uFEFF' + csvContent; // BOM para UTF-8 no Excel
+    }
+
+    generateJSONContent(tasks) {
+        const exportData = {
+            meta: {
+                exportedAt: new Date().toISOString(),
+                exportedBy: 'Task Time Manager',
+                version: '1.0',
+                totalTasks: tasks.length,
+                totalHours: tasks.reduce((sum, task) => sum + (task.actualHours || 0), 0),
+                totalValue: tasks.reduce((sum, task) => {
+                    const hours = task.actualHours || 0;
+                    const rate = task.hourlyRate || 0;
+                    return sum + (hours * rate);
+                }, 0)
+            },
+            filters: {
+                project: document.getElementById('exportProjectFilter').value || null,
+                status: document.getElementById('exportStatusFilter').value || null,
+                dateFrom: document.getElementById('exportDateFrom').value || null,
+                dateTo: document.getElementById('exportDateTo').value || null
+            },
+            projects: this.projects.filter(project => 
+                tasks.some(task => task.projectId === project.id)
+            ),
+            tasks: tasks.map(task => ({
+                ...task,
+                projectName: this.getProjectName(task.projectId),
+                statusText: this.getStatusText(task.status),
+                totalCost: (task.actualHours || 0) * (task.hourlyRate || 0)
+            }))
+        };
+        
+        return JSON.stringify(exportData, null, 2);
+    }
+
+    getStatusText(status) {
+        const statusMap = {
+            'Not Started': 'Não Iniciado',
+            'In Progress': 'Em Progresso',
+            'Completed': 'Concluído',
+            'On Hold': 'Em Pausa'
+        };
+        return statusMap[status] || status;
     }
 
     // Utility Functions

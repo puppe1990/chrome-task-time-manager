@@ -20,6 +20,7 @@
                     </select>
                     <button id="addTaskBtn" class="btn btn-primary">+ Nova Tarefa</button>
                     <button id="addProjectBtn" class="btn btn-secondary">+ Projeto</button>
+                    <button id="exportBtn" class="btn btn-export">📤 Exportar</button>
                     <button id="statsBtn" class="btn btn-stats">📊 Estatísticas</button>
                 </div>
             </div>
@@ -75,7 +76,7 @@
         <div id="statsPanel" class="stats-panel hidden">
             <div class="stats-header">
                 <h2>📊 Estatísticas do Projeto</h2>
-                <button id="closeStatsBtn" class="btn-close">✕</button>
+                <button id="closeStatsBtn" class="btn-close" title="Fechar estatísticas">✕</button>
             </div>
             <div class="stats-content">
                 <div class="stats-grid">
@@ -210,6 +211,147 @@
                     <button type="submit" id="saveEditTimer" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content export-modal-content">
+            <div class="modal-header">
+                <h2>📤 Exportar Ordens de Serviço</h2>
+                <button id="closeExportModal" class="close-btn">&times;</button>
+            </div>
+            <div class="export-modal-body">
+                <!-- Opções de Formato -->
+                <div class="export-section">
+                    <h3>Formato de Exportação</h3>
+                    <div class="format-options">
+                        <label class="format-option">
+                            <input type="radio" name="exportFormat" value="html" checked>
+                            <div class="format-card">
+                                <div class="format-icon">📄</div>
+                                <div class="format-info">
+                                    <strong>HTML (Nota de Serviço)</strong>
+                                    <span>Documento profissional para impressão/PDF</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="format-option">
+                            <input type="radio" name="exportFormat" value="csv">
+                            <div class="format-card">
+                                <div class="format-icon">📊</div>
+                                <div class="format-info">
+                                    <strong>CSV (Planilha)</strong>
+                                    <span>Dados tabulares para Excel/Sheets</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="format-option">
+                            <input type="radio" name="exportFormat" value="json">
+                            <div class="format-card">
+                                <div class="format-icon">💾</div>
+                                <div class="format-info">
+                                    <strong>JSON (Backup)</strong>
+                                    <span>Dados estruturados para backup</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Filtros de Dados -->
+                <div class="export-section">
+                    <h3>Filtros de Dados</h3>
+                    <div class="export-filters">
+                        <div class="filter-group">
+                            <label>Projeto</label>
+                            <select id="exportProjectFilter">
+                                <option value="">Todos os Projetos</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Status</label>
+                            <select id="exportStatusFilter">
+                                <option value="">Todos os Status</option>
+                                <option value="Not Started">Não Iniciado</option>
+                                <option value="In Progress">Em Progresso</option>
+                                <option value="On Hold">Em Pausa</option>
+                                <option value="Completed">Concluído</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Período</label>
+                            <div class="date-range">
+                                <input type="date" id="exportDateFrom" placeholder="De">
+                                <span>até</span>
+                                <input type="date" id="exportDateTo" placeholder="Até">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opções de Personalização -->
+                <div class="export-section html-only">
+                    <h3>Personalização (HTML)</h3>
+                    <div class="customization-options">
+                        <div class="form-group">
+                            <label>Nome da Empresa</label>
+                            <input type="text" id="companyName" placeholder="Ex: Minha Empresa Ltda">
+                        </div>
+                        <div class="form-group">
+                            <label>CNPJ</label>
+                            <input type="text" id="companyCnpj" placeholder="Ex: 00.000.000/0000-00">
+                        </div>
+                        <div class="form-group">
+                            <label>E-mail</label>
+                            <input type="email" id="companyEmail" placeholder="Ex: contato@empresa.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Telefone</label>
+                            <input type="tel" id="companyPhone" placeholder="Ex: (11) 99999-9999">
+                        </div>
+                        <div class="form-group">
+                            <label>Observações</label>
+                            <textarea id="exportNotes" rows="3" placeholder="Observações adicionais para a nota de serviço..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumo -->
+                <div class="export-section">
+                    <div class="export-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">Tarefas selecionadas:</span>
+                            <span id="selectedTasksCount" class="summary-value">0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Total de horas:</span>
+                            <span id="selectedHoursTotal" class="summary-value">0h</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Valor total:</span>
+                            <span id="selectedValueTotal" class="summary-value">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="export-section">
+                    <h3>Preview</h3>
+                    <div id="exportPreview" class="export-preview">
+                        <div class="preview-placeholder">
+                            Selecione as opções acima para ver o preview
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ações -->
+                <div class="export-actions">
+                    <button id="previewExportBtn" class="btn btn-secondary">👁️ Atualizar Preview</button>
+                    <button id="downloadExportBtn" class="btn btn-primary">⬇️ Baixar Exportação</button>
+                    <button id="cancelExportBtn" class="btn btn-outline">Cancelar</button>
+                </div>
+            </div>
         </div>
     </div>
 
