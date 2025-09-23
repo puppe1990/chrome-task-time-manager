@@ -901,9 +901,13 @@ class KanbanTaskManager {
         }).join('');
         
         // Auto-select all tasks if none are selected yet
-        if (this.selectedTaskIds.size === 0) {
+        if (this.selectedTaskIds.size === 0 && availableTasks.length > 0) {
             availableTasks.forEach(task => this.selectedTaskIds.add(task.id));
-            this.renderTaskSelectionList(); // Re-render to show selections
+            // Update UI to reflect selections
+            setTimeout(() => {
+                this.updateExportSummary();
+                this.updateExportPreview();
+            }, 100);
         }
     }
     
