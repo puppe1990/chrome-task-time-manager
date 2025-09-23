@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Time Manager - Kanban Board</title>
+    <link rel="stylesheet" href="fullscreen.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>⏱️ Task Manager - Kanban Board</h1>
+            </div>
+            <div class="header-right">
+                <div class="filters-header">
+                    <select id="projectFilter" class="filter-select">
+                        <option value="">Todos os Projetos</option>
+                    </select>
+                    <button id="addTaskBtn" class="btn btn-primary">+ Nova Tarefa</button>
+                    <button id="addProjectBtn" class="btn btn-secondary">+ Projeto</button>
+                    <button id="statsBtn" class="btn btn-stats">📊 Estatísticas</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Kanban Board -->
+            <div class="kanban-board" id="kanbanBoard">
+                <div class="kanban-column" data-status="Not Started">
+                    <div class="column-header">
+                        <h3>🔵 Não Iniciado</h3>
+                        <span class="task-count" id="count-not-started">0</span>
+                    </div>
+                    <div class="column-content" id="column-not-started">
+                        <!-- Tasks will be added here -->
+                    </div>
+                </div>
+
+                <div class="kanban-column" data-status="In Progress">
+                    <div class="column-header">
+                        <h3>🟡 Em Progresso</h3>
+                        <span class="task-count" id="count-in-progress">0</span>
+                    </div>
+                    <div class="column-content" id="column-in-progress">
+                        <!-- Tasks will be added here -->
+                    </div>
+                </div>
+
+                <div class="kanban-column" data-status="On Hold">
+                    <div class="column-header">
+                        <h3>🟠 Em Pausa</h3>
+                        <span class="task-count" id="count-on-hold">0</span>
+                    </div>
+                    <div class="column-content" id="column-on-hold">
+                        <!-- Tasks will be added here -->
+                    </div>
+                </div>
+
+                <div class="kanban-column" data-status="Completed">
+                    <div class="column-header">
+                        <h3>🟢 Concluído</h3>
+                        <span class="task-count" id="count-completed">0</span>
+                    </div>
+                    <div class="column-content" id="column-completed">
+                        <!-- Tasks will be added here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Statistics Panel (Hidden by default) -->
+        <div id="statsPanel" class="stats-panel hidden">
+            <div class="stats-header">
+                <h2>📊 Estatísticas do Projeto</h2>
+                <button id="closeStatsBtn" class="btn-close">✕</button>
+            </div>
+            <div class="stats-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total de Tarefas</h3>
+                        <span id="totalTasks" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Concluídas</h3>
+                        <span id="completedTasks" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Em Progresso</h3>
+                        <span id="inProgressTasks" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Taxa de Conclusão</h3>
+                        <span id="completionRate" class="stat-number">0%</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Horas Estimadas</h3>
+                        <span id="totalEstimated" class="stat-number">0h</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Horas Reais</h3>
+                        <span id="totalActual" class="stat-number">0h</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Eficiência</h3>
+                        <span id="efficiency" class="stat-number">0%</span>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Dinheiro Ganho</h3>
+                        <span id="totalEarnings" class="stat-number">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nova Tarefa</h2>
+                <button id="closeModal" class="close-btn">&times;</button>
+            </div>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label for="taskTitle">Título *</label>
+                    <input type="text" id="taskTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Descrição</label>
+                    <textarea id="taskDescription" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="projectSelect">Projeto</label>
+                    <select id="projectSelect"></select>
+                </div>
+                <div class="form-group" id="newProjectGroup" style="display:none;">
+                    <label for="newProjectName">Novo Projeto</label>
+                    <input type="text" id="newProjectName" placeholder="Nome do novo projeto">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="estimatedHours">Horas Estimadas</label>
+                        <input type="number" id="estimatedHours" min="0" step="0.5" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDeadline">Prazo</label>
+                        <input type="date" id="taskDeadline">
+                    </div>
+                    <div class="form-group">
+                        <label for="hourlyRate">Valor por hora (R$)</label>
+                        <input type="number" id="hourlyRate" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="taskStatus">Status</label>
+                    <select id="taskStatus">
+                        <option value="Not Started">Não Iniciado</option>
+                        <option value="In Progress">Em Progresso</option>
+                        <option value="Completed">Concluído</option>
+                        <option value="On Hold">Em Pausa</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancelTask" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div id="projectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="projectModalTitle">Novo Projeto</h2>
+                <button id="closeProjectModal" class="close-btn">&times;</button>
+            </div>
+            <form id="projectForm">
+                <input type="hidden" id="projectId">
+                <div class="form-group">
+                    <label for="projectName">Nome do Projeto *</label>
+                    <input type="text" id="projectName" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancelProject" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Timer Modal -->
+    <div id="editTimerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Tempo da Tarefa</h2>
+                <button id="closeEditTimerModal" class="close-btn">&times;</button>
+            </div>
+            <form id="editTimerForm">
+                <div class="form-group">
+                    <label for="editTimerInput">Tempo (HH:MM:SS, HH:MM ou horas decimais)</label>
+                    <input type="text" id="editTimerInput" placeholder="Ex.: 01:30:00 ou 1,5" />
+                    <small id="editTimerHelper" style="color:#666; display:block; margin-top:6px;"></small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancelEditTimer" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" id="saveEditTimer" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="fullscreen.js"></script>
+</body>
+</html>

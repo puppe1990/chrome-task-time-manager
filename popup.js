@@ -35,6 +35,7 @@ class TaskManager {
 
         // Modal
         document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
+        document.getElementById('fullscreenBtn').addEventListener('click', () => this.openFullscreenView());
         document.getElementById('closeModal').addEventListener('click', () => this.closeTaskModal());
         document.getElementById('cancelTask').addEventListener('click', () => this.closeTaskModal());
         document.getElementById('taskForm').addEventListener('submit', (e) => this.handleTaskSubmit(e));
@@ -460,6 +461,12 @@ class TaskManager {
         this.currentEditingTask = null;
     }
 
+    openFullscreenView() {
+        chrome.tabs.create({
+            url: chrome.runtime.getURL('fullscreen.html')
+        });
+    }
+
     handleTaskSubmit(e) {
         e.preventDefault();
         
@@ -556,6 +563,16 @@ class TaskManager {
 
         const arr = [...tasks];
         arr.sort((a, b) => {
+            // First priority: tasks with active timers go to the top
+            const aTimer = this.timers.get(a.id);
+            const bTimer = this.timers.get(b.id);
+            const aIsActive = aTimer && aTimer.isRunning;
+            const bIsActive = bTimer && bTimer.isRunning;
+            
+            if (aIsActive && !bIsActive) return -1;
+            if (!aIsActive && bIsActive) return 1;
+            
+            // If both have active timers or both don't, use the selected sort option
             switch (opt) {
                 case 'created_asc':
                     return (getDate(a.createdAt) || 0) - (getDate(b.createdAt) || 0);
@@ -720,6 +737,7 @@ class TaskManager {
             this.saveRunningTimers();
         }
 
+        // Re-render tasks to reorder them (active timers go to top)
         this.renderTasks();
     }
 
@@ -731,6 +749,7 @@ class TaskManager {
         task.actualHours = 0;
         this.updateTask(taskId, { actualHours: 0 });
         this.saveRunningTimers();
+        // Re-render tasks to reorder them (active timers go to top)
         this.renderTasks();
     }
 
@@ -785,6 +804,7 @@ class TaskManager {
         this.saveRunningTimers();
 
         this.closeEditTimerModal();
+        // Re-render tasks to reorder them (active timers go to top)
         this.renderTasks();
     }
 
