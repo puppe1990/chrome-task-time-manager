@@ -184,6 +184,8 @@ body {
     flex: 1;
     padding: 24px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Kanban Board */
@@ -191,8 +193,8 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 20px;
-    height: 100%;
-    overflow: hidden;
+    flex: 1;
+    min-height: 0;
 }
 
 .kanban-column {
@@ -203,6 +205,8 @@ body {
     flex-direction: column;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transition: all 0.2s ease;
+    height: 100%;
+    min-height: 0;
 }
 
 .kanban-column:hover {
@@ -243,6 +247,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
 }
 
 /* Kanban Task Cards */
