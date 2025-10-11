@@ -9,6 +9,15 @@ class KanbanTaskManager {
         this.projectFilterValue = '';
         this.draggedTask = null;
         this.selectedTaskIds = new Set(); // Para controlar quais tarefas estão selecionadas para exportação
+        this.pendingConfirmAction = null;
+        this.confirmModalEl = null;
+        this.confirmTitleEl = null;
+        this.confirmMessageEl = null;
+        this.confirmConfirmBtn = null;
+        this.confirmCancelBtn = null;
+        this.confirmCloseBtn = null;
+        this.defaultConfirmText = '';
+        this.defaultCancelText = '';
         this.init();
     }
 
@@ -59,6 +68,8 @@ class KanbanTaskManager {
         document.getElementById('closeEditTimerModal').addEventListener('click', () => this.closeEditTimerModal());
         document.getElementById('cancelEditTimer').addEventListener('click', () => this.closeEditTimerModal());
         document.getElementById('editTimerForm').addEventListener('submit', (e) => this.handleEditTimerSubmit(e));
+
+        this.setupConfirmModal();
 
         // Modal click outside to close
         document.getElementById('taskModal').addEventListener('click', (e) => {
@@ -153,7 +164,7 @@ class KanbanTaskManager {
                     this.duplicateTask(taskId);
                     break;
                 case 'delete':
-                    this.deleteTask(taskId);
+                    this.confirmTaskDeletion(taskId);
                     break;
                 case 'toggle-timer':
                     this.toggleTimer(taskId);
@@ -566,6 +577,81 @@ class KanbanTaskManager {
         document.getElementById('projectModal').style.display = 'none';
         document.getElementById('projectId').value = '';
         document.getElementById('projectName').value = '';
+    }
+
+    setupConfirmModal() {
+        this.confirmModalEl = document.getElementById('confirmModal');
+        this.confirmTitleEl = document.getElementById('confirmModalTitle');
+        this.confirmMessageEl = document.getElementById('confirmModalMessage');
+        this.confirmConfirmBtn = document.getElementById('confirmConfirmBtn');
+        this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
+        this.confirmCloseBtn = document.getElementById('closeConfirmModal');
+        this.defaultConfirmText = this.confirmConfirmBtn ? this.confirmConfirmBtn.textContent : 'Sim';
+        this.defaultCancelText = this.confirmCancelBtn ? this.confirmCancelBtn.textContent : 'Não';
+
+        if (this.confirmConfirmBtn) {
+            this.confirmConfirmBtn.addEventListener('click', () => {
+                const action = this.pendingConfirmAction;
+                this.closeConfirmModal();
+                if (typeof action === 'function') action();
+            });
+        }
+
+        [this.confirmCancelBtn, this.confirmCloseBtn].forEach((btn) => {
+            if (btn) btn.addEventListener('click', () => this.closeConfirmModal());
+        });
+
+        if (this.confirmModalEl) {
+            this.confirmModalEl.addEventListener('click', (e) => {
+                if (e.target === this.confirmModalEl) {
+                    this.closeConfirmModal();
+                }
+            });
+        }
+    }
+
+    openConfirmModal({ title, message, confirmText, cancelText, onConfirm }) {
+        if (!this.confirmModalEl) return;
+        if (this.confirmTitleEl) this.confirmTitleEl.textContent = title || 'Confirmar ação';
+        if (this.confirmMessageEl) this.confirmMessageEl.textContent = message || '';
+
+        if (this.confirmConfirmBtn) {
+            this.confirmConfirmBtn.textContent = confirmText || this.defaultConfirmText || 'Sim';
+        }
+        if (this.confirmCancelBtn) {
+            this.confirmCancelBtn.textContent = cancelText || this.defaultCancelText || 'Não';
+        }
+
+        this.pendingConfirmAction = typeof onConfirm === 'function' ? onConfirm : null;
+        this.confirmModalEl.style.display = 'block';
+    }
+
+    closeConfirmModal() {
+        if (this.confirmModalEl) {
+            this.confirmModalEl.style.display = 'none';
+        }
+        if (this.confirmConfirmBtn && this.defaultConfirmText) {
+            this.confirmConfirmBtn.textContent = this.defaultConfirmText;
+        }
+        if (this.confirmCancelBtn && this.defaultCancelText) {
+            this.confirmCancelBtn.textContent = this.defaultCancelText;
+        }
+        this.pendingConfirmAction = null;
+    }
+
+    confirmTaskDeletion(taskId) {
+        const task = this.tasks.find((t) => t.id === taskId);
+        const taskName = task && task.title ? `"${task.title}"` : 'esta tarefa';
+
+        this.openConfirmModal({
+            title: 'Excluir tarefa',
+            message: `Tem certeza que deseja excluir ${taskName}? Esta ação não pode ser desfeita.`,
+            confirmText: 'Sim, excluir',
+            cancelText: 'Não',
+            onConfirm: () => {
+                this.deleteTask(taskId);
+            }
+        });
     }
 
     openEditTimerModal(taskId) {
