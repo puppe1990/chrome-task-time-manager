@@ -149,6 +149,9 @@ class KanbanTaskManager {
                     const task = this.tasks.find(t => t.id === taskId);
                     if (task) this.openTaskModal(task);
                     break;
+                case 'duplicate':
+                    this.duplicateTask(taskId);
+                    break;
                 case 'delete':
                     this.deleteTask(taskId);
                     break;
@@ -318,6 +321,30 @@ class KanbanTaskManager {
         this.updateProjectFilter();
     }
 
+    duplicateTask(taskId) {
+        const originalTask = this.tasks.find(t => t.id === taskId);
+        if (!originalTask) return;
+
+        const baseTitle = `${originalTask.title} (cópia)`;
+        let newTitle = baseTitle;
+        let counter = 2;
+        while (this.tasks.some(t => t.title === newTitle)) {
+            newTitle = `${originalTask.title} (cópia ${counter})`;
+            counter += 1;
+        }
+
+        this.createTask({
+            title: newTitle,
+            description: originalTask.description,
+            projectId: originalTask.projectId,
+            estimatedHours: originalTask.estimatedHours,
+            actualHours: 0,
+            hourlyRate: originalTask.hourlyRate,
+            deadline: originalTask.deadline,
+            status: originalTask.status
+        });
+    }
+
     updateTask(taskId, taskData) {
         const taskIndex = this.tasks.findIndex(t => t.id === taskId);
         if (taskIndex !== -1) {
@@ -446,6 +473,7 @@ class KanbanTaskManager {
                         ${projectName ? `<span class="task-category">${this.escapeHtml(projectName)}</span>` : ''}
                     </div>
                     <div class="task-actions">
+                        <button class="btn btn-small btn-primary" title="Duplicar" data-action="duplicate" data-task-id="${task.id}">📋</button>
                         <button class="btn btn-small btn-secondary" title="Editar" data-action="edit" data-task-id="${task.id}">✏️</button>
                         <button class="btn btn-small btn-danger" title="Excluir" data-action="delete" data-task-id="${task.id}">🗑️</button>
                     </div>

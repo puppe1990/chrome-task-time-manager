@@ -121,6 +121,9 @@ class TaskManager {
                     if (task) this.openTaskModal(task);
                     break;
                 }
+                case 'duplicate':
+                    this.duplicateTask(taskId);
+                    break;
                 case 'delete':
                     this.deleteTask(taskId);
                     this.renderTasks();
@@ -369,6 +372,31 @@ class TaskManager {
         this.saveTasks();
         this.updateProjectFilter();
         this.updateStats();
+    }
+
+    duplicateTask(taskId) {
+        const originalTask = this.tasks.find(t => t.id === taskId);
+        if (!originalTask) return;
+
+        const baseTitle = `${originalTask.title} (cópia)`;
+        let newTitle = baseTitle;
+        let counter = 2;
+        while (this.tasks.some(t => t.title === newTitle)) {
+            newTitle = `${originalTask.title} (cópia ${counter})`;
+            counter += 1;
+        }
+
+        this.createTask({
+            title: newTitle,
+            description: originalTask.description,
+            projectId: originalTask.projectId,
+            estimatedHours: originalTask.estimatedHours,
+            actualHours: 0,
+            hourlyRate: originalTask.hourlyRate,
+            deadline: originalTask.deadline,
+            status: originalTask.status
+        });
+        this.renderTasks();
     }
 
     updateTask(taskId, taskData) {
@@ -658,6 +686,7 @@ class TaskManager {
                     </div>
                     <div class="task-actions">
                         <button class="btn btn-small" title="Exportar nota" data-action="export-task-note" data-task-id="${task.id}">📄</button>
+                        <button class="btn btn-small btn-primary" title="Duplicar tarefa" data-action="duplicate" data-task-id="${task.id}">📋</button>
                         <button class="btn btn-small btn-success" data-action="edit" data-task-id="${task.id}">✏️</button>
                         <button class="btn btn-small btn-secondary" data-action="delete" data-task-id="${task.id}">🗑️</button>
                     </div>
